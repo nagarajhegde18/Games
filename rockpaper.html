@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Rock Paper Scissors Battle</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{overflow:hidden;background:#0b1020;font-family:system-ui,"Segoe UI",Arial,sans-serif;color:#fff}
+  canvas{display:block;touch-action:none}
+  #hud{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:5}
+  .card{background:rgba(255,255,255,.1);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);
+        padding:8px 18px;border-radius:12px;text-align:center;min-width:105px}
+  .card span{font-size:13px;opacity:.85}
+  .card b{font-size:26px;display:block}
+  #rock{border-bottom:4px solid #ffb020}
+  #paper{border-bottom:4px solid #3aa0ff}
+  #scissors{border-bottom:4px solid #ff4d6d}
+  #controls{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;
+            background:rgba(255,255,255,.1);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);
+            padding:10px 16px;border-radius:14px;z-index:5;flex-wrap:wrap;justify-content:center;max-width:95vw}
+  button{background:#4f46e5;color:#fff;border:0;padding:8px 16px;border-radius:8px;font-size:14px;cursor:pointer}
+  button:hover{background:#6366f1}
+  label{font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer}
+  #winner{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+          background:rgba(0,0,0,.45);z-index:10;text-align:center;gap:18px}
+  #winner h1{font-size:clamp(28px,6vw,60px);text-shadow:0 4px 20px rgba(0,0,0,.6)}
+  #hint{position:fixed;top:92px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.6;z-index:5;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="card" id="rock"><span>🪨 Rock</span><b id="cRock">50</b></div>
+  <div class="card" id="paper"><span>📄 Paper</span><b id="cPaper">50</b></div>
+  <div class="card" id="scissors"><span>✂️ Scissors</span><b id="cScissors">50</b></div>
+</div>
+<div id="hint">Drag to rotate • Scroll to zoom • Click anywhere once to enable sound</div>
+
+<div id="controls">
+  <button id="btnPause">⏸ Pause</button>
+  <button id="btnRestart">🔄 Restart</button>
+  <button id="btnSound">🔊 Sound On</button>
+  <label>Speed <input type="range" id="speed" min="0.5" max="3" step="0.1" value="1"></label>
+  <label><input type="checkbox" id="chase" checked> Smart chase</label>
+  <label><input type="checkbox" id="emoji"> Emoji mode</label>
+</div>
+
+<div id="winner">
+  <h1 id="winnerText"></h1>
+  <button id="btnAgain">▶ Play Again</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  // ---------- SETTINGS ----------
+  const COUNT = 50;                 // each type
+  const ARENA_W = 40, ARENA_D = 26; // arena size
+  const HIT_DIST = 1.7;             // touch distance
+  const TYPES = ['rock', 'paper', 'scissors'];
+
+  // RULES: key beats value (the loser converts to the winner's type)
+  const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+
+  const RING_COLORS = { rock: 0xffb020, paper: 0x3aa0ff, scissors: 0xff4d6d };
+  const NAMES = { rock: '🪨 Rock', paper: '📄 Paper', scissors: '✂️ Scissors' };
+  const EMOJIS = { rock: '🪨', paper: '📄', scissors: '✂️' };
+
+  // ---------- SCENE ----------
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1020);
+  scene.fog = new THREE.Fog(0x0b1020, 60, 120);
+
+  const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 300);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x20243a, 0.8));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  sun.position.set(15, 30, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 24, bottom: -24, near: 1, far: 80 });
+  scene.add(sun);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(ARENA_W + 4, ARENA_D + 4),
+    new THREE.MeshStandardMaterial({ color: 0x151b33, roughness: 0.9 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(ARENA_W + 4, (ARENA_W + 4) / 2, 0x2b3566, 0x1e2650);
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x4f46e5, emissive: 0x2a2488, emissiveIntensity: 0.6 });
+  [[0, -ARENA_D / 2 - 0.3, ARENA_W + 1, 0.6], [0, ARENA_D / 2 + 0.3, ARENA_W + 1, 0.6]].forEach(([x, z, w, d]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1, d), wallMat); m.position.set(x, 0.5, z); scene.add(m);
+  });
+  [[-ARENA_W / 2 - 0.3, 0, 0.6, ARENA_D + 1], [ARENA_W / 2 + 0.3, 0, 0.6, ARENA_D + 1]].forEach(([x, z, w, d]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1, d), wallMat); m.position.set(x, 0.5, z); scene.add(m);
+  });
+
+  // ---------- SHARED GEOMETRY / MATERIALS ----------
+  const rockGeo = new THREE.DodecahedronGeometry(0.85, 0);
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8f98, flatShading: true, roughness: 0.95 });
+
+  const paperGeo = new THREE.BoxGeometry(1.5, 0.1, 1.9);
+  const paperMat = new THREE.MeshStandardMaterial({ color: 0xf4f6ff, roughness: 0.6 });
+  const lineGeo = new THREE.BoxGeometry(1.0, 0.02, 0.06);
+  const lineMat = new THREE.MeshStandardMaterial({ color: 0x5a7bd8 });
+
+  const bladeGeo = new THREE.BoxGeometry(0.2, 0.08, 1.8);
+  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xd5dde8, metalness: 0.8, roughness: 0.25 });
+  const handleGeo = new THREE.TorusGeometry(0.26, 0.07, 8, 18);
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0xff4d6d, roughness: 0.5 });
+
+  const ringGeo = new THREE.RingGeometry(0.95, 1.15, 28);
+  const ringMats = {};
+  TYPES.forEach(t => ringMats[t] = new THREE.MeshBasicMaterial({ color: RING_COLORS[t], transparent: true, opacity: 0.75, side: THREE.DoubleSide }));
+
+  // Emoji sprite materials (drawn on a canvas)
+  function emojiMaterial(emoji) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    ctx.font = '96px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 64, 70);
+    const tex = new THREE.CanvasTexture(c);
+    return new THREE.SpriteMaterial({ map: tex, transparent: true });
+  }
+  const spriteMats = {};
+  TYPES.forEach(t => spriteMats[t] = emojiMaterial(EMOJIS[t]));
+
+  function makeRock() {
+    const m = new THREE.Mesh(rockGeo, rockMat);
+    m.castShadow = true; m.position.y = 0.85;
+    return m;
+  }
+  function makePaper() {
+    const g = new THREE.Group();
+    const sheet = new THREE.Mesh(paperGeo, paperMat); sheet.castShadow = true; g.add(sheet);
+    for (let i = -1; i <= 1; i++) {
+      const l = new THREE.Mesh(lineGeo, lineMat); l.position.set(0, 0.06, i * 0.5); g.add(l);
+    }
+    g.position.y = 0.9;
+    return g;
+  }
+  function makeScissors() {
+    const g = new THREE.Group();
+    const b1 = new THREE.Mesh(bladeGeo, bladeMat); b1.rotation.y = 0.22; b1.position.set(0.06, 0, 0.25);
+    const b2 = new THREE.Mesh(bladeGeo, bladeMat); b2.rotation.y = -0.22; b2.position.set(-0.06, 0, 0.25);
+    b1.castShadow = b2.castShadow = true;
+    const h1 = new THREE.Mesh(handleGeo, handleMat); h1.rotation.x = Math.PI / 2; h1.position.set(0.3, 0, -0.95);
+    const h2 = new THREE.Mesh(handleGeo, handleMat); h2.rotation.x = Math.PI / 2; h2.position.set(-0.3, 0, -0.95);
+    h1.castShadow = h2.castShadow = true;
+    g.add(b1, b2, h1, h2);
+    g.position.y = 0.9;
+    return g;
+  }
+
+  // ---------- SOUND (WebAudio, no files needed) ----------
+  let audioCtx = null, muted = false, lastSound = 0;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, ensureAudio));
+
+  function tone(freq, dur, type = 'sine', vol = 0.07, slideTo = null, delay = 0) {
+    if (muted || !audioCtx || audioCtx.state !== 'running') return;
+    const t0 = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  function playConvert(type) {
+    const now = performance.now();
+    if (now - lastSound < 40) return;   // avoid sound spam when many convert at once
+    lastSound = now;
+    if (type === 'rock')          tone(190, 0.16, 'sine', 0.12, 70);        // low thud
+    else if (type === 'paper')    tone(620, 0.12, 'triangle', 0.07, 900);   // soft swish up
+    else                          tone(1100, 0.07, 'square', 0.035, 1700);  // sharp snip
+  }
+
+  function playWin() {
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.35, 'triangle', 0.09, null, i * 0.13));
+  }
+
+  // ---------- PARTICLES ----------
+  const MAXP = 1000;
+  const pPos = new Float32Array(MAXP * 3);
+  const pCol = new Float32Array(MAXP * 3);
+  const pBase = new Float32Array(MAXP * 3);
+  const pVel = new Float32Array(MAXP * 3);
+  const pLife = new Float32Array(MAXP);
+  let pIndex = 0;
+
+  for (let i = 0; i < MAXP; i++) pPos[i * 3 + 1] = -100;
+
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+  const pMat = new THREE.PointsMaterial({
+    size: 0.55, vertexColors: true, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const particles = new THREE.Points(pGeo, pMat);
+  particles.frustumCulled = false;
+  scene.add(particles);
+
+  const tmpColor = new THREE.Color();
+  function spawnBurst(x, z, hex, count, power = 1) {
+    tmpColor.setHex(hex);
+    for (let n = 0; n < count; n++) {
+      const i = pIndex; pIndex = (pIndex + 1) % MAXP;
+      const a = Math.random() * Math.PI * 2;
+      const s = (2.5 + Math.random() * 5) * power;
+      pPos[i * 3] = x; pPos[i * 3 + 1] = 1.1; pPos[i * 3 + 2] = z;
+      pVel[i * 3] = Math.cos(a) * s;
+      pVel[i * 3 + 1] = (3 + Math.random() * 5) * power;
+      pVel[i * 3 + 2] = Math.sin(a) * s;
+      pBase[i * 3] = tmpColor.r; pBase[i * 3 + 1] = tmpColor.g; pBase[i * 3 + 2] = tmpColor.b;
+      pLife[i] = 1;
+    }
+  }
+
+  function updateParticles(dt) {
+    for (let i = 0; i < MAXP; i++) {
+      if (pLife[i] <= 0) continue;
+      pLife[i] -= dt * 1.5;
+      if (pLife[i] <= 0) { pPos[i * 3 + 1] = -100; pCol[i * 3] = pCol[i * 3 + 1] = pCol[i * 3 + 2] = 0; continue; }
+      pVel[i * 3 + 1] -= 14 * dt;
+      pPos[i * 3]     += pVel[i * 3] * dt;
+      pPos[i * 3 + 1] += pVel[i * 3 + 1] * dt;
+      pPos[i * 3 + 2] += pVel[i * 3 + 2] * dt;
+      if (pPos[i * 3 + 1] < 0.05) { pPos[i * 3 + 1] = 0.05; pVel[i * 3 + 1] *= -0.4; }
+      const l = pLife[i];
+      pCol[i * 3] = pBase[i * 3] * l;
+      pCol[i * 3 + 1] = pBase[i * 3 + 1] * l;
+      pCol[i * 3 + 2] = pBase[i * 3 + 2] * l;
+    }
+    pGeo.attributes.position.needsUpdate = true;
+    pGeo.attributes.color.needsUpdate = true;
+  }
+
+  function clearParticles() {
+    pLife.fill(0);
+    for (let i = 0; i < MAXP; i++) { pPos[i * 3 + 1] = -100; pCol[i * 3] = pCol[i * 3 + 1] = pCol[i * 3 + 2] = 0; }
+    pGeo.attributes.position.needsUpdate = true;
+    pGeo.attributes.color.needsUpdate = true;
+  }
+
+  function confetti() {
+    const cols = [0xffb020, 0x3aa0ff, 0xff4d6d, 0x4ade80, 0xffffff];
+    for (let k = 0; k < 40; k++) {
+      spawnBurst((Math.random() - 0.5) * ARENA_W * 0.8, (Math.random() - 0.5) * ARENA_D * 0.8,
+                 cols[k % cols.length], 14, 1.4);
+    }
+  }
+
+  // ---------- ENTITIES ----------
+  let entities = [];
+  let emojiMode = false;
+
+  function refreshVisibility(e) {
+    for (let i = 0; i < 3; i++) {
+      const match = TYPES[i] === e.type;
+      e.models[i].visible = !emojiMode && match;
+      e.sprites[i].visible = emojiMode && match;
+    }
+  }
+
+  function setType(e, type) {
+    e.type = type;
+    e.ring.material = ringMats[type];
+    refreshVisibility(e);
+  }
+
+  function convert(loser, winnerType) {
+    setType(loser, winnerType);
+    loser.pop = 1;
+    spawnBurst(loser.x, loser.z, RING_COLORS[winnerType], 12);
+    playConvert(winnerType);
+  }
+
+  function createEntity() {
+    const group = new THREE.Group();
+    const models = [makeRock(), makePaper(), makeScissors()];
+    models.forEach(m => group.add(m));
+
+    const sprites = TYPES.map(t => {
+      const s = new THREE.Sprite(spriteMats[t]);
+      s.scale.set(2.4, 2.4, 1);
+      s.position.y = 1.5;
+      group.add(s);
+      return s;
+    });
+
+    const ring = new THREE.Mesh(ringGeo, ringMats.rock);
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
+    group.add(ring);
+    scene.add(group);
+    return { group, models, sprites, ring, type: 'rock', x: 0, z: 0, vx: 0, vz: 0, speed: 4, pop: 0, phase: Math.random() * 10 };
+  }
+
+  function initGame() {
+    entities.forEach(e => scene.remove(e.group));
+    entities = [];
+    clearParticles();
+
+    const cols = 15, rows = 10, sx = 2.5, sz = 2.5;
+    const slots = [];
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        slots.push([(c - (cols - 1) / 2) * sx, (r - (rows - 1) / 2) * sz]);
+    slots.sort(() => Math.random() - 0.5);
+
+    let k = 0;
+    TYPES.forEach(t => {
+      for (let i = 0; i < COUNT; i++) {
+        const e = createEntity();
+        setType(e, t);
+        e.x = slots[k][0] + (Math.random() - 0.5) * 0.5;
+        e.z = slots[k][1] + (Math.random() - 0.5) * 0.5;
+        const a = Math.random() * Math.PI * 2;
+        e.speed = 3.2 + Math.random() * 1.6;
+        e.vx = Math.cos(a) * e.speed;
+        e.vz = Math.sin(a) * e.speed;
+        e.group.position.set(e.x, 0, e.z);
+        entities.push(e);
+        k++;
+      }
+    });
+    finished = false;
+    document.getElementById('winner').style.display = 'none';
+    updateHUD();
+  }
+
+  // ---------- GAME LOOP ----------
+  let paused = false, finished = false, speedMul = 1, smartChase = true, time = 0;
+
+  function update(dt) {
+    time += dt;
+    const n = entities.length;
+
+    if (smartChase) {
+      for (let i = 0; i < n; i++) {
+        const a = entities[i];
+        let preyD = 1e9, prey = null, predD = 1e9, pred = null;
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const b = entities[j];
+          const dx = b.x - a.x, dz = b.z - a.z, d = dx * dx + dz * dz;
+          if (b.type === BEATS[a.type] && d < preyD) { preyD = d; prey = b; }
+          else if (BEATS[b.type] === a.type && d < predD) { predD = d; pred = b; }
+        }
+        let ax = 0, az = 0;
+        if (prey) { const d = Math.sqrt(preyD) + 0.001; ax += (prey.x - a.x) / d * 6; az += (prey.z - a.z) / d * 6; }
+        if (pred && predD < 64) { const d = Math.sqrt(predD) + 0.001; ax -= (pred.x - a.x) / d * 5; az -= (pred.z - a.z) / d * 5; }
+        a.vx += ax * dt; a.vz += az * dt;
+      }
+    }
+
+    const hw = ARENA_W / 2 - 1, hd = ARENA_D / 2 - 1;
+    for (const e of entities) {
+      const sp = Math.hypot(e.vx, e.vz) || 1;
+      e.vx = e.vx / sp * e.speed; e.vz = e.vz / sp * e.speed;
+      e.x += e.vx * dt; e.z += e.vz * dt;
+      if (e.x > hw)  { e.x = hw;  e.vx = -Math.abs(e.vx); }
+      if (e.x < -hw) { e.x = -hw; e.vx =  Math.abs(e.vx); }
+      if (e.z > hd)  { e.z = hd;  e.vz = -Math.abs(e.vz); }
+      if (e.z < -hd) { e.z = -hd; e.vz =  Math.abs(e.vz); }
+    }
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const a = entities[i], b = entities[j];
+        const dx = b.x - a.x, dz = b.z - a.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < HIT_DIST * HIT_DIST) {
+          if (a.type !== b.type) {
+            if (BEATS[a.type] === b.type) convert(b, a.type);
+            else convert(a, b.type);
+          }
+          const d = Math.sqrt(d2) || 0.001;
+          const nx = dx / d, nz = dz / d, overlap = (HIT_DIST - d) / 2;
+          a.x -= nx * overlap; a.z -= nz * overlap;
+          b.x += nx * overlap; b.z += nz * overlap;
+          const va = a.vx * nx + a.vz * nz, vb = b.vx * nx + b.vz * nz;
+          if (va - vb > 0) {
+            a.vx += (vb - va) * nx; a.vz += (vb - va) * nz;
+            b.vx += (va - vb) * nx; b.vz += (va - vb) * nz;
+          }
+        }
+      }
+    }
+
+    for (const e of entities) {
+      e.group.position.set(e.x, 0, e.z);
+      e.group.rotation.y = Math.atan2(e.vx, e.vz);
+      const bob = Math.sin(time * 6 + e.phase) * 0.12;
+      e.models[0].position.y = 0.85 + Math.abs(bob);
+      e.models[0].rotation.x += dt * 4;
+      e.models[1].position.y = 0.9 + bob;
+      e.models[1].rotation.z = Math.sin(time * 4 + e.phase) * 0.25;
+      e.models[2].position.y = 0.9 + bob;
+      e.models[2].rotation.z = Math.sin(time * 5 + e.phase) * 0.12;
+      e.sprites.forEach(s => s.position.y = 1.5 + Math.abs(bob) * 1.5);
+      e.pop = Math.max(0, e.pop - dt * 2.5);
+      e.group.scale.setScalar(1 + e.pop * 0.7);
+    }
+    updateHUD();
+  }
+
+  function updateHUD() {
+    const c = { rock: 0, paper: 0, scissors: 0 };
+    entities.forEach(e => c[e.type]++);
+    document.getElementById('cRock').textContent = c.rock;
+    document.getElementById('cPaper').textContent = c.paper;
+    document.getElementById('cScissors').textContent = c.scissors;
+    const alive = TYPES.filter(t => c[t] > 0);
+    if (!finished && alive.length === 1) {
+      finished = true;
+      document.getElementById('winnerText').textContent = NAMES[alive[0]] + ' wins! 🏆';
+      document.getElementById('winner').style.display = 'flex';
+      confetti();
+      playWin();
+    }
+  }
+
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if (!paused) {
+      if (!finished) update(dt * speedMul);
+      updateParticles(dt);   // keeps running after the win so confetti falls
+    }
+    renderer.render(scene, camera);
+  }
+
+  // ---------- CAMERA CONTROL ----------
+  let theta = 0, phi = 0.95, radius = 42, dragging = false, lx = 0, ly = 0;
+  function updateCamera() {
+    camera.position.set(
+      radius * Math.sin(phi) * Math.sin(theta),
+      radius * Math.cos(phi),
+      radius * Math.sin(phi) * Math.cos(theta)
+    );
+    camera.lookAt(0, 0, 0);
+  }
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; });
+  addEventListener('pointerup', () => dragging = false);
+  addEventListener('pointermove', e => {
+    if (!dragging) return;
+    theta -= (e.clientX - lx) * 0.005;
+    phi = Math.min(1.45, Math.max(0.2, phi - (e.clientY - ly) * 0.005));
+    lx = e.clientX; ly = e.clientY;
+    updateCamera();
+  });
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    radius = Math.min(75, Math.max(15, radius + e.deltaY * 0.03));
+    updateCamera();
+  }, { passive: false });
+
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  // ---------- UI ----------
+  document.getElementById('btnPause').onclick = e => {
+    paused = !paused; e.target.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  };
+  document.getElementById('btnRestart').onclick = initGame;
+  document.getElementById('btnAgain').onclick = initGame;
+  document.getElementById('btnSound').onclick = e => {
+    muted = !muted;
+    e.target.textContent = muted ? '🔇 Sound Off' : '🔊 Sound On';
+  };
+  document.getElementById('speed').oninput = e => speedMul = parseFloat(e.target.value);
+  document.getElementById('chase').onchange = e => smartChase = e.target.checked;
+  document.getElementById('emoji').onchange = e => {
+    emojiMode = e.target.checked;
+    entities.forEach(refreshVisibility);
+  };
+
+  // ---------- START ----------
+  updateCamera();
+  initGame();
+  animate();
+})();
+</script>
+</body>
+</html>

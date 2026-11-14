@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>3D Snake Game</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    overflow: hidden; background: #0b1020; font-family: Arial, sans-serif; color: #fff;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+  }
+  #hud {
+    position: fixed; top: 14px; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: center; gap: 24px;
+    font-size: 19px; font-weight: bold; pointer-events: none;
+    text-shadow: 0 2px 8px #000;
+  }
+  #fx {
+    position: fixed; top: 46px; left: 0; right: 0; z-index: 5; text-align: center;
+    font-size: 16px; font-weight: bold; color: #7dd3fc; pointer-events: none;
+    text-shadow: 0 2px 8px #000;
+  }
+  body.day #hud { color: #0f172a; text-shadow: 0 1px 4px rgba(255,255,255,0.8); }
+  body.day #fx  { color: #0369a1; text-shadow: 0 1px 4px rgba(255,255,255,0.8); }
+
+  #btns { position: fixed; top: 52px; right: 12px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
+  .ib {
+    width: 42px; height: 42px; border-radius: 50%; border: 1px solid #334155;
+    background: rgba(15, 23, 42, 0.8); color: #fff; font-size: 18px; cursor: pointer;
+  }
+  .ib:hover { background: #1e293b; }
+
+  #dpad {
+    display: none; position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    z-index: 5; grid-template-columns: repeat(3, 66px); grid-template-rows: repeat(2, 66px); gap: 8px;
+    grid-template-areas: ". up ." "left down right";
+  }
+  #dpad.show { display: grid; }
+  #dpad button {
+    border-radius: 50%; border: 2px solid rgba(148, 163, 184, 0.5);
+    background: rgba(15, 23, 42, 0.65); color: #e2e8f0; font-size: 24px; cursor: pointer;
+  }
+  #dpad button:active { background: rgba(34, 197, 94, 0.6); }
+  #dpad [data-d="up"] { grid-area: up; }
+  #dpad [data-d="left"] { grid-area: left; }
+  #dpad [data-d="down"] { grid-area: down; }
+  #dpad [data-d="right"] { grid-area: right; }
+
+  #overlay {
+    position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(5, 8, 20, 0.82); padding: 20px; color: #fff;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 { font-size: 44px; margin-bottom: 10px; color: #4ade80; }
+  #overlay p { font-size: 16px; margin-bottom: 8px; color: #cbd5e1; }
+  #msg { white-space: pre-line; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 10px 0 4px; font-size: 14px; color: #e2e8f0; max-width: 520px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .big {
+    margin-top: 18px; padding: 14px 36px; font-size: 18px; font-weight: bold;
+    border: none; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(135deg, #22c55e, #14b8a6); color: #04111a;
+  }
+  .big:hover { transform: scale(1.05); }
+
+  @media (max-width: 480px) {
+    #hud { font-size: 15px; gap: 14px; }
+    #overlay h1 { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div>Score: <span id="score">0</span></div>
+  <div>Length: <span id="length">3</span></div>
+  <div>Best: <span id="best">0</span></div>
+</div>
+<div id="fx"></div>
+
+<div id="btns">
+  <button class="ib" id="pauseBtn" title="Pause (P)">⏸</button>
+  <button class="ib" id="muteBtn" title="Mute (M)">🔊</button>
+  <button class="ib" id="themeBtn" title="Day / Night (T)">☀️</button>
+  <button class="ib" id="dpadBtn" title="On-screen D-pad (G)">🎮</button>
+</div>
+
+<div id="dpad">
+  <button data-d="up">▲</button>
+  <button data-d="left">◀</button>
+  <button data-d="down">▼</button>
+  <button data-d="right">▶</button>
+</div>
+
+<div id="overlay">
+  <h1 id="title">3D SNAKE</h1>
+  <p id="msg">Eat food to grow bigger!</p>
+  <div class="legend">
+    <span><i style="background:#ef4444"></i>Apple +1</span>
+    <span><i style="background:#fbbf24"></i>Gold +5 (vanishes fast)</span>
+    <span><i style="background:#38bdf8"></i>Ice +2 (slow motion)</span>
+    <span><i style="background:#6b7280"></i>Rock = deadly! (new one every 5 points)</span>
+  </div>
+  <p style="margin-top:12px">Arrows / WASD / Swipe / D-pad<br>P Pause &nbsp;|&nbsp; M Mute &nbsp;|&nbsp; T Day-Night &nbsp;|&nbsp; G D-pad</p>
+  <button class="big" id="startBtn">START GAME</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ================= Settings =================
+const GRID = 20, HALF = GRID / 2;
+const OBSTACLES_ON = true;     // set false to disable rocks
+const OBSTACLE_EVERY = 5;      // new rock every N points
+const MAX_OBSTACLES = 14;
+
+const wx = x => x - HALF + 0.5;
+const wz = z => z - HALF + 0.5;
+const $ = id => document.getElementById(id);
+
+// ================= Themes =================
+const THEMES = {
+  night: { bg: 0x0b1020, amb: 0.55, sun: 0.8, c1: '#1e293b', c2: '#16213a', base: 0x0f172a,
+           wall: 0x38bdf8, wallEm: 0x0ea5e9, wallEmI: 0.6, glow: 1.3, rock: 0x6b7280 },
+  day:   { bg: 0x87ceeb, amb: 0.95, sun: 1.1, c1: '#86efac', c2: '#bbf7d0', base: 0x14532d,
+           wall: 0x475569, wallEm: 0x000000, wallEmI: 0, glow: 0, rock: 0x57534e }
+};
+let theme = 'night';
+try { theme = localStorage.getItem('snake3dTheme') === 'day' ? 'day' : 'night'; } catch (e) {}
+
+// ================= Scene =================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1020);
+scene.fog = new THREE.Fog(0x0b1020, 22, 48);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 17, 14);
+camera.lookAt(0, 0, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.55);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+sun.position.set(8, 18, 6);
+sun.castShadow = true;
+sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+sun.shadow.camera.top = 14;   sun.shadow.camera.bottom = -14;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
+
+// Floor (checkerboard drawn on a canvas so theme can redraw it)
+const floorCanvas = document.createElement('canvas');
+floorCanvas.width = floorCanvas.height = GRID * 32;
+const floorCtx = floorCanvas.getContext('2d');
+const floorTex = new THREE.CanvasTexture(floorCanvas);
+function drawFloor(c1, c2) {
+  for (let i = 0; i < GRID; i++)
+    for (let j = 0; j < GRID; j++) {
+      floorCtx.fillStyle = (i + j) % 2 ? c1 : c2;
+      floorCtx.fillRect(i * 32, j * 32, 32, 32);
+    }
+  floorTex.needsUpdate = true;
+}
+drawFloor(THEMES[theme].c1, THEMES[theme].c2);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(GRID, GRID),
+  new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const base = new THREE.Mesh(
+  new THREE.BoxGeometry(GRID + 1, 0.6, GRID + 1),
+  new THREE.MeshStandardMaterial({ color: 0x0f172a })
+);
+base.position.y = -0.31;
+scene.add(base);
+
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0ea5e9, emissiveIntensity: 0.6 });
+[[0, -HALF - 0.25, GRID + 1, 0.5], [0, HALF + 0.25, GRID + 1, 0.5],
+ [-HALF - 0.25, 0, 0.5, GRID + 1], [HALF + 0.25, 0, 0.5, GRID + 1]].forEach(([x, z, w, d]) => {
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.7, d), wallMat);
+  wall.position.set(x, 0.35, z);
+  wall.castShadow = true;
+  scene.add(wall);
+});
+
+// ================= Sound (Web Audio, no files needed) =================
+let audioCtx = null, muted = false;
+function initAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+function tone(freq, dur, type = 'sine', vol = 0.12, delay = 0, endFreq) {
+  if (!audioCtx || muted) return;
+  const t0 = audioCtx.currentTime + delay;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t0 + dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(t0); o.stop(t0 + dur);
+}
+function sfx(name) {
+  if (name === 'normal') tone(520, 0.12, 'square', 0.07, 0, 880);
+  else if (name === 'gold') [660, 880, 1100, 1320].forEach((f, i) => tone(f, 0.15, 'triangle', 0.12, i * 0.07));
+  else if (name === 'ice') tone(900, 0.35, 'sine', 0.12, 0, 300);
+  else if (name === 'rock') tone(160, 0.25, 'sawtooth', 0.08, 0, 70);
+  else if (name === 'over') tone(300, 0.6, 'sawtooth', 0.12, 0, 60);
+  else if (name === 'start') [440, 660].forEach((f, i) => tone(f, 0.1, 'square', 0.07, i * 0.08));
+  else if (name === 'pause') tone(400, 0.08, 'square', 0.06);
+  else if (name === 'theme') tone(700, 0.15, 'triangle', 0.08, 0, 500);
+}
+
+// ================= Food types =================
+const FOODS = {
+  normal: { color: 0xef4444, geo: new THREE.IcosahedronGeometry(0.4, 1), points: 1, grow: 1 },
+  gold:   { color: 0xfbbf24, geo: new THREE.OctahedronGeometry(0.5),     points: 5, grow: 2, life: 8000 },
+  ice:    { color: 0x38bdf8, geo: new THREE.DodecahedronGeometry(0.42),  points: 2, grow: 1, slow: true }
+};
+function pickType() {
+  const r = Math.random();
+  return r < 0.15 ? 'gold' : r < 0.32 ? 'ice' : 'normal';
+}
+
+// ================= Game state =================
+let snake, meshes, dir, nextDir, food, foodMesh, foodLight;
+let score = 0, pending = 0, gameTime = 0, slowUntil = 0, state = 'ready';
+let obstacles = [], nextObstacleAt = OBSTACLE_EVERY;
+let toastText = '', toastUntil = 0;
+let best = 0;
+try { best = +localStorage.getItem('snake3dBest') || 0; } catch (e) {}
+$('best').textContent = best;
+
+const bodyGeo = new THREE.SphereGeometry(0.45, 24, 24);
+const rockGeo = new THREE.DodecahedronGeometry(0.52, 0);
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 1, flatShading: true });
+
+function makeSegment(index) {
+  if (index === 0) {
+    const g = new THREE.Group();
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.55, 28, 28),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.4 })
+    );
+    head.castShadow = true;
+    g.add(head);
+    [-0.25, 0.25].forEach(s => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      eye.position.set(0.32, 0.2, s);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+      pupil.position.set(0.1, 0, 0);
+      eye.add(pupil);
+      g.add(eye);
+    });
+    // glow light that follows the head (strong at night, off by day)
+    const hl = new THREE.PointLight(0x86efac, THEMES[theme].glow, 7);
+    hl.position.y = 1;
+    g.add(hl);
+    return g;
+  }
+  const hue = (140 - index * 4 + 360) % 360;
+  const m = new THREE.Mesh(
+    bodyGeo,
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${hue}, 70%, 45%)`), roughness: 0.5 })
+  );
+  m.castShadow = true;
+  return m;
+}
+
+function addSegment() {
+  const idx = meshes.length;
+  const m = makeSegment(idx);
+  const c = snake[idx];
+  m.position.set(wx(c.x), 0.5, wz(c.z));
+  m.scale.setScalar(0.1);
+  scene.add(m);
+  meshes.push(m);
+}
+
+// ---- helpers for placing things ----
+function isBlocked(x, z) {
+  return snake.some(s => s.x === x && s.z === z) ||
+         obstacles.some(o => o.x === x && o.z === z) ||
+         (food && food.x === x && food.z === z);
+}
+
+function spawnFood() {
+  let p;
+  do {
+    p = { x: Math.floor(Math.random() * GRID), z: Math.floor(Math.random() * GRID) };
+  } while (isBlocked(p.x, p.z));
+
+  const type = score === 0 ? 'normal' : pickType();
+  const f = FOODS[type];
+  food = { x: p.x, z: p.z, type, expires: f.life ? gameTime + f.life : Infinity };
+
+  if (!foodMesh) {
+    foodMesh = new THREE.Mesh(f.geo, new THREE.MeshStandardMaterial());
+    foodMesh.castShadow = true;
+    foodLight = new THREE.PointLight(0xffffff, 1, 5);
+    foodMesh.add(foodLight);
+    scene.add(foodMesh);
+  }
+  foodMesh.geometry = f.geo;
+  foodMesh.material.color.setHex(f.color);
+  foodMesh.material.emissive.setHex(f.color);
+  foodMesh.material.emissiveIntensity = 0.8;
+  foodLight.color.setHex(f.color);
+  foodMesh.visible = true;
+  foodMesh.position.set(wx(p.x), 0.6, wz(p.z));
+}
+
+function addObstacle() {
+  if (!OBSTACLES_ON || obstacles.length >= MAX_OBSTACLES) return;
+  for (let tries = 0; tries < 60; tries++) {
+    const x = Math.floor(Math.random() * GRID);
+    const z = Math.floor(Math.random() * GRID);
+    if (isBlocked(x, z)) continue;
+    const h = snake[0];
+    if (Math.abs(x - h.x) + Math.abs(z - h.z) < 5) continue; // never spawn right in front of the head
+    const mesh = new THREE.Mesh(rockGeo, rockMat);
+    mesh.position.set(wx(x), 0.45, wz(z));
+    mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    mesh.scale.setScalar(0.1);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    obstacles.push({ x, z, mesh });
+    sfx('rock');
+    showToast('🪨 New rock appeared!');
+    return;
+  }
+}
+
+function showToast(text) { toastText = text; toastUntil = gameTime + 1800; }
+
+function resetGame() {
+  if (meshes) meshes.forEach(m => scene.remove(m));
+  obstacles.forEach(o => scene.remove(o.mesh));
+  obstacles = [];
+  snake = [{ x: 9, z: 10 }, { x: 8, z: 10 }, { x: 7, z: 10 }];
+  meshes = [];
+  snake.forEach((c, i) => {
+    const m = makeSegment(i);
+    m.position.set(wx(c.x), 0.5, wz(c.z));
+    scene.add(m);
+    meshes.push(m);
+  });
+  dir = { x: 1, z: 0 };
+  nextDir = { x: 1, z: 0 };
+  score = 0; pending = 0; gameTime = 0; slowUntil = 0; toastUntil = 0;
+  nextObstacleAt = OBSTACLE_EVERY;
+  food = null;
+  spawnFood();
+  updateHUD();
+}
+
+function updateHUD() {
+  $('score').textContent = score;
+  $('length').textContent = snake.length;
+  $('best').textContent = best;
+}
+
+// ================= Game logic =================
+function step() {
+  dir = nextDir;
+  const nh = { x: snake[0].x + dir.x, z: snake[0].z + dir.z };
+
+  if (nh.x < 0 || nh.x >= GRID || nh.z < 0 || nh.z >= GRID) return gameOver('Hit the wall!');
+  if (obstacles.some(o => o.x === nh.x && o.z === nh.z)) return gameOver('Crashed into a rock!');
+
+  const ate = nh.x === food.x && nh.z === food.z;
+  if (ate) pending += FOODS[food.type].grow;
+  const willGrow = pending > 0;
+
+  const body = willGrow ? snake : snake.slice(0, -1);
+  if (body.some(s => s.x === nh.x && s.z === nh.z)) return gameOver('Bit yourself!');
+
+  snake.unshift(nh);
+  if (willGrow) { pending--; addSegment(); } else snake.pop();
+
+  if (ate) {
+    const f = FOODS[food.type];
+    score += f.points;
+    if (f.slow) slowUntil = gameTime + 5000;
+    burst(foodMesh.position, f.color);
+    sfx(food.type);
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem('snake3dBest', best); } catch (e) {}
+    }
+    spawnFood();
+    while (score >= nextObstacleAt) { addObstacle(); nextObstacleAt += OBSTACLE_EVERY; }
+  }
+  updateHUD();
+}
+
+function showOverlay(title, msg, btn) {
+  $('title').textContent = title;
+  $('msg').textContent = msg;
+  $('startBtn').textContent = btn;
+  $('overlay').classList.remove('hidden');
+}
+
+function gameOver(reason) {
+  state = 'over';
+  sfx('over');
+  meshes[0].children[0].material.color.set(0xef4444);
+  const newBest = score > 0 && score === best ? '\n🏆 New best!' : '';
+  showOverlay('GAME OVER', `${reason}\nScore: ${score}  |  Length: ${snake.length}${newBest}`, 'PLAY AGAIN');
+}
+
+function startGame() {
+  initAudio();
+  resetGame();
+  state = 'playing';
+  acc = 0;
+  $('pauseBtn').textContent = '⏸';
+  $('overlay').classList.add('hidden');
+  sfx('start');
+}
+
+function pauseGame() {
+  if (state !== 'playing') return;
+  state = 'paused';
+  sfx('pause');
+  $('pauseBtn').textContent = '▶';
+  showOverlay('PAUSED', `Score: ${score}  |  Length: ${snake.length}`, 'RESUME');
+}
+function resumeGame() {
+  if (state !== 'paused') return;
+  state = 'playing';
+  sfx('pause');
+  $('pauseBtn').textContent = '⏸';
+  $('overlay').classList.add('hidden');
+}
+function togglePause() { state === 'playing' ? pauseGame() : resumeGame(); }
+
+function toggleMute() {
+  muted = !muted;
+  $('muteBtn').textContent = muted ? '🔇' : '🔊';
+}
+
+// ================= Theme (day / night) =================
+function applyTheme(name) {
+  theme = name;
+  const T = THEMES[name];
+  scene.background.setHex(T.bg);
+  scene.fog.color.setHex(T.bg);
+  ambient.intensity = T.amb;
+  sun.intensity = T.sun;
+  drawFloor(T.c1, T.c2);
+  base.material.color.setHex(T.base);
+  wallMat.color.setHex(T.wall);
+  wallMat.emissive.setHex(T.wallEm);
+  wallMat.emissiveIntensity = T.wallEmI;
+  rockMat.color.setHex(T.rock);
+  document.body.classList.toggle('day', name === 'day');
+  $('themeBtn').textContent = name === 'day' ? '🌙' : '☀️';
+  if (meshes && meshes[0]) {
+    const l = meshes[0].children.find(c => c.isPointLight);
+    if (l) l.intensity = T.glow;
+  }
+  try { localStorage.setItem('snake3dTheme', name); } catch (e) {}
+}
+function toggleTheme() {
+  initAudio();
+  sfx('theme');
+  applyTheme(theme === 'night' ? 'day' : 'night');
+}
+
+// ================= D-pad =================
+const dpad = $('dpad');
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches) dpad.classList.add('show');
+function toggleDpad() { dpad.classList.toggle('show'); }
+
+// ================= Particles =================
+const particles = [];
+function burst(pos, color) {
+  for (let i = 0; i < 16; i++) {
+    const p = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 6),
+      new THREE.MeshBasicMaterial({ color, transparent: true })
+    );
+    p.position.copy(pos);
+    p.userData.v = new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 4 + 1, (Math.random() - 0.5) * 5);
+    p.userData.life = 1;
+    scene.add(p);
+    particles.push(p);
+  }
+}
+
+// ================= Controls =================
+function setDir(x, z) {
+  if (state !== 'playing') return;
+  if (x === -dir.x && z === -dir.z) return;
+  nextDir = { x, z };
+}
+
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === ' ' || k.startsWith('arrow')) e.preventDefault();
+  initAudio();
+  if (k === 'm') return toggleMute();
+  if (k === 't') return toggleTheme();
+  if (k === 'g') return toggleDpad();
+  if (k === 'p' || k === 'escape') return togglePause();
+  if (k === ' ' || k === 'enter') {
+    if (state === 'ready' || state === 'over') return startGame();
+    return togglePause();
+  }
+  if (k === 'arrowup' || k === 'w') setDir(0, -1);
+  else if (k === 'arrowdown' || k === 's') setDir(0, 1);
+  else if (k === 'arrowleft' || k === 'a') setDir(-1, 0);
+  else if (k === 'arrowright' || k === 'd') setDir(1, 0);
+});
+
+// Swipe (ignored when touching a button)
+let tx = 0, ty = 0, swipeOK = true;
+addEventListener('touchstart', e => {
+  swipeOK = !(e.target.closest && e.target.closest('button'));
+  tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+});
+addEventListener('touchend', e => {
+  if (!swipeOK) return;
+  const dx = e.changedTouches[0].clientX - tx;
+  const dy = e.changedTouches[0].clientY - ty;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 30) return;
+  if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
+  else setDir(0, dy > 0 ? 1 : -1);
+});
+
+// D-pad buttons
+dpad.querySelectorAll('button').forEach(b => {
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    initAudio();
+    const d = b.dataset.d;
+    if (d === 'up') setDir(0, -1);
+    else if (d === 'down') setDir(0, 1);
+    else if (d === 'left') setDir(-1, 0);
+    else if (d === 'right') setDir(1, 0);
+  });
+});
+
+$('startBtn').addEventListener('click', () => (state === 'paused' ? resumeGame() : startGame()));
+$('pauseBtn').addEventListener('click', togglePause);
+$('muteBtn').addEventListener('click', () => { initAudio(); toggleMute(); });
+$('themeBtn').addEventListener('click', toggleTheme);
+$('dpadBtn').addEventListener('click', toggleDpad);
+document.querySelectorAll('button').forEach(b => b.addEventListener('click', () => b.blur()));
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+
+// Responsive camera: pull back on narrow (portrait) screens so the whole board fits
+let fit = 1;
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  fit = Math.min(1.7, Math.max(1, 0.95 / camera.aspect));
+  scene.fog.near = 22 * fit;
+  scene.fog.far = 48 * fit;
+}
+addEventListener('resize', onResize);
+
+// ================= Main loop =================
+let last = 0, acc = 0;
+const tmp = new THREE.Vector3();
+resetGame();
+applyTheme(theme);
+onResize();
+camera.position.set(0, 17 * fit, 14 * fit);
+
+function animate(t) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((t - last) / 1000, 0.1);
+  last = t;
+
+  if (state === 'playing') {
+    gameTime += dt * 1000;
+    acc += dt * 1000;
+    let interval = Math.max(70, 140 - score * 2);
+    if (gameTime < slowUntil) interval *= 1.8;      // ice food slow motion
+    if (acc >= interval) { acc -= interval; step(); }
+    if (state === 'playing' && food.expires < gameTime) spawnFood(); // gold food vanished
+  }
+
+  // Status text (toast first, then slow-motion timer)
+  const slowLeft = slowUntil - gameTime;
+  if (state === 'playing' && gameTime < toastUntil) $('fx').textContent = toastText;
+  else if (state !== 'ready' && slowLeft > 0) $('fx').textContent = `❄ SLOW MOTION ${Math.ceil(slowLeft / 1000)}s`;
+  else $('fx').textContent = '';
+
+  // Smooth snake movement
+  meshes.forEach((m, i) => {
+    const c = snake[i];
+    if (!c) return;
+    tmp.set(wx(c.x), 0.5, wz(c.z));
+    m.position.lerp(tmp, Math.min(1, dt * 20));
+    const target = i === 0 ? 1 : Math.max(0.7, 1 - i * 0.015);
+    m.scale.setScalar(m.scale.x + (target - m.scale.x) * Math.min(1, dt * 10));
+  });
+  meshes[0].rotation.y = Math.atan2(-dir.z, dir.x);
+
+  // Rocks pop in
+  obstacles.forEach(o => {
+    o.mesh.scale.setScalar(o.mesh.scale.x + (1 - o.mesh.scale.x) * Math.min(1, dt * 6));
+  });
+
+  // Food animation (blinks when about to vanish)
+  foodMesh.rotation.y += dt * 2;
+  foodMesh.position.y = 0.6 + Math.sin(t / 300) * 0.12;
+  const remaining = food.expires - gameTime;
+  foodMesh.visible = remaining > 3000 || Math.floor(t / 120) % 2 === 0;
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.userData.v.y -= 12 * dt;
+    p.position.addScaledVector(p.userData.v, dt);
+    p.userData.life -= dt * 1.8;
+    p.material.opacity = Math.max(p.userData.life, 0);
+    if (p.userData.life <= 0) { scene.remove(p); particles.splice(i, 1); }
+  }
+
+  // Camera follows head slightly
+  const h = meshes[0].position;
+  camera.position.x += (h.x * 0.3 - camera.position.x) * dt * 2;
+  camera.position.y += (17 * fit - camera.position.y) * dt * 2;
+  camera.position.z += (14 * fit + h.z * 0.2 - camera.position.z) * dt * 2;
+  camera.lookAt(h.x * 0.2, 0, h.z * 0.2);
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
