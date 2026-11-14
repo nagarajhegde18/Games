@@ -7,7 +7,7 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden;touch-action:none}
-  body{background:#0b1020;font-family:system-ui,"Segoe UI",Arial,sans-serif;color:#fff}
+  body{overflow:hidden;background:#0b1020;font-family:system-ui,"Segoe UI",Arial,sans-serif;color:#fff}
   canvas{display:block;touch-action:none}
   #hud{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:5}
   .card{background:rgba(255,255,255,.1);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);
@@ -66,11 +66,14 @@
 <script>
 (() => {
   // ---------- SETTINGS ----------
-  const COUNT = 50;
-  const ARENA_W = 40, ARENA_D = 26;
-  const HIT_DIST = 1.7;
+  const COUNT = 50;                 // each type
+  const ARENA_W = 40, ARENA_D = 26; // arena size
+  const HIT_DIST = 1.7;             // touch distance
   const TYPES = ['rock', 'paper', 'scissors'];
+
+  // RULES: key beats value (the loser converts to the winner's type)
   const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+
   const RING_COLORS = { rock: 0xffb020, paper: 0x3aa0ff, scissors: 0xff4d6d };
   const NAMES = { rock: '🪨 Rock', paper: '📄 Paper', scissors: '✂️ Scissors' };
   const EMOJIS = { rock: '🪨', paper: '📄', scissors: '✂️' };
@@ -114,13 +117,15 @@
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1, d), wallMat); m.position.set(x, 0.5, z); scene.add(m);
   });
 
-  // ---------- GEOMETRY / MATERIALS ----------
+  // ---------- SHARED GEOMETRY / MATERIALS ----------
   const rockGeo = new THREE.DodecahedronGeometry(0.85, 0);
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8f98, flatShading: true, roughness: 0.95 });
+
   const paperGeo = new THREE.BoxGeometry(1.5, 0.1, 1.9);
   const paperMat = new THREE.MeshStandardMaterial({ color: 0xf4f6ff, roughness: 0.6 });
   const lineGeo = new THREE.BoxGeometry(1.0, 0.02, 0.06);
   const lineMat = new THREE.MeshStandardMaterial({ color: 0x5a7bd8 });
+
   const bladeGeo = new THREE.BoxGeometry(0.2, 0.08, 1.8);
   const bladeMat = new THREE.MeshStandardMaterial({ color: 0xd5dde8, metalness: 0.8, roughness: 0.25 });
   const handleGeo = new THREE.TorusGeometry(0.26, 0.07, 8, 18);
@@ -130,6 +135,7 @@
   const ringMats = {};
   TYPES.forEach(t => ringMats[t] = new THREE.MeshBasicMaterial({ color: RING_COLORS[t], transparent: true, opacity: 0.75, side: THREE.DoubleSide }));
 
+  // Emoji sprite materials (drawn on a canvas)
   function emojiMaterial(emoji) {
     const c = document.createElement('canvas');
     c.width = c.height = 128;
@@ -138,7 +144,8 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(emoji, 64, 70);
-    return new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true });
+    const tex = new THREE.CanvasTexture(c);
+    return new THREE.SpriteMaterial({ map: tex, transparent: true });
   }
   const spriteMats = {};
   TYPES.forEach(t => spriteMats[t] = emojiMaterial(EMOJIS[t]));
@@ -170,7 +177,7 @@
     return g;
   }
 
-  // ---------- SOUND ----------
+  // ---------- SOUND (WebAudio, no files needed) ----------
   let audioCtx = null, muted = false, lastSound = 0;
 
   function ensureAudio() {
@@ -199,12 +206,13 @@
 
   function playConvert(type) {
     const now = performance.now();
-    if (now - lastSound < 40) return;
+    if (now - lastSound < 40) return;   // avoid sound spam when many convert at once
     lastSound = now;
-    if (type === 'rock')          tone(190, 0.16, 'sine', 0.12, 70);
-    else if (type === 'paper')    tone(620, 0.12, 'triangle', 0.07, 900);
-    else                          tone(1100, 0.07, 'square', 0.035, 1700);
+    if (type === 'rock')          tone(190, 0.16, 'sine', 0.12, 70);        // low thud
+    else if (type === 'paper')    tone(620, 0.12, 'triangle', 0.07, 900);   // soft swish up
+    else                          tone(1100, 0.07, 'square', 0.035, 1700);  // sharp snip
   }
+
   function playWin() {
     [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.35, 'triangle', 0.09, null, i * 0.13));
   }
@@ -217,6 +225,7 @@
   const pVel = new Float32Array(MAXP * 3);
   const pLife = new Float32Array(MAXP);
   let pIndex = 0;
+
   for (let i = 0; i < MAXP; i++) pPos[i * 3 + 1] = -100;
 
   const pGeo = new THREE.BufferGeometry();
@@ -309,6 +318,7 @@
     const group = new THREE.Group();
     const models = [makeRock(), makePaper(), makeScissors()];
     models.forEach(m => group.add(m));
+
     const sprites = TYPES.map(t => {
       const s = new THREE.Sprite(spriteMats[t]);
       s.scale.set(2.4, 2.4, 1);
@@ -316,6 +326,7 @@
       group.add(s);
       return s;
     });
+
     const ring = new THREE.Mesh(ringGeo, ringMats.rock);
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
     group.add(ring);
@@ -454,33 +465,49 @@
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!paused) {
       if (!finished) update(dt * speedMul);
-      updateParticles(dt);
+      updateParticles(dt);   // keeps running after the win so confetti falls
     }
     renderer.render(scene, camera);
   }
 
-  // ---------- CAMERA (fixed top-down, always fits screen) ----------
+  // ---------- CAMERA (fixed top-down, fits the free area between HUD and controls) ----------
+  const hudEl = document.getElementById('hud');
+  const ctrlEl = document.getElementById('controls');
+
   function fitCamera() {
-    const aspect = innerWidth / innerHeight;
+    const W = innerWidth, H = innerHeight, aspect = W / H;
     const portrait = aspect < 1;
 
-    const halfH = (portrait ? ARENA_W : ARENA_D) / 2 + 2;
-    const halfW = (portrait ? ARENA_D : ARENA_W) / 2 + 2;
+    // free screen area = below the top HUD, above the bottom control panel
+    const top = hudEl.getBoundingClientRect().bottom + 6;
+    const bottom = ctrlEl.getBoundingClientRect().top - 6;
+    const freeH = Math.max(120, bottom - top);
+    const centerY = (top + bottom) / 2;
 
+    const halfH = (portrait ? ARENA_W : ARENA_D) / 2 + 1.5;
+    const halfW = (portrait ? ARENA_D : ARENA_W) / 2 + 1.5;
     const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    const dist = Math.max(halfH / t, halfW / (t * aspect)) * 1.25; // room for HUD/buttons
+    const dist = Math.max(halfH / (t * freeH / H), halfW / (t * aspect));
 
     camera.up.set(portrait ? 1 : 0, 0, portrait ? 0 : -1);
     camera.position.set(0, dist, 0);
     camera.lookAt(0, 0, 0);
+    // move the arena's center to the middle of the free area
+    camera.setViewOffset(W, H, 0, -(centerY - H / 2), W, H);
   }
 
-  addEventListener('resize', () => {
+  function onResize() {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
     fitCamera();
-  });
+  }
+  addEventListener('resize', onResize);
+  addEventListener('orientationchange', () => setTimeout(onResize, 200));
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(fitCamera);
+    ro.observe(hudEl); ro.observe(ctrlEl);
+  }
 
   // ---------- UI ----------
   document.getElementById('btnPause').onclick = e => {
