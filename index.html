@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Game Arcade – Play All Games in One Place</title>
-<meta name="description" content="Play Void Striker, 3D Chess, Ludo, Snake, Rock Paper Scissors, Endless Car Race and Snakes & Ladders in one page.">
+<meta name="description" content="Play 13 free games in one page: Chess, Ludo, Snake, Pong, Flappy Bird, Memory Match, Reaction Time, Car Race, Void Striker and more.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
@@ -76,11 +76,20 @@
   .stat strong{display:block;font-family:'Orbitron',sans-serif;font-size:1.6rem}
   .stat span{font-size:.78rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
 
-  .section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
   .section-title h2{font-size:1.5rem;font-weight:700}
   .section-title span{color:var(--muted);font-size:.9rem}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:24px}
+  /* category filter */
+  .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px}
+  .chip{
+    padding:8px 18px;border-radius:999px;cursor:pointer;border:1px solid var(--panel-b);background:var(--panel);
+    color:var(--muted);font:600 .82rem 'Poppins',sans-serif;transition:.2s
+  }
+  .chip:hover{color:var(--text);background:rgba(255,255,255,.12)}
+  .chip.active{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--accent),#4f8bff);box-shadow:0 6px 18px -4px var(--accent)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px}
   .card{
     position:relative;overflow:hidden;cursor:pointer;text-align:left;color:inherit;font:inherit;
     border-radius:var(--radius);padding:0;background:var(--panel);border:1px solid var(--panel-b);
@@ -94,14 +103,14 @@
     box-shadow:0 24px 50px rgba(0,0,0,.45),0 0 0 1px var(--c1) inset,0 0 40px -8px var(--c1)
   }
   .thumb{
-    height:170px;display:grid;place-items:center;position:relative;overflow:hidden;
+    height:160px;display:grid;place-items:center;position:relative;overflow:hidden;
     background:linear-gradient(135deg,var(--c1),var(--c2))
   }
   .thumb::before{
     content:"";position:absolute;inset:0;
     background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.35),transparent 55%);
   }
-  .thumb .emoji{font-size:4.6rem;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));transition:transform .4s;position:relative}
+  .thumb .emoji{font-size:4.4rem;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35));transition:transform .4s;position:relative}
   .card:hover .emoji{transform:scale(1.2) rotate(-6deg)}
   .badge{
     position:absolute;top:14px;right:14px;padding:5px 12px;border-radius:999px;font-size:.7rem;font-weight:700;
@@ -168,15 +177,15 @@
   <div class="wrap">
     <nav>
       <div class="logo"><i>🎮</i>GAME ARCADE</div>
-      <div class="pill">Pick a game • <b id="countPill">7</b> ready to play</div>
+      <div class="pill">Pick a game • <b id="countPill">13</b> ready to play</div>
     </nav>
 
     <header class="hero">
       <h1>Play <span class="grad">Every Game</span><br>In One Place</h1>
-      <p>Classic board games, 3D battles, space shooters and arcade racing — all running right here on a single page. No downloads, no sign-ups. Just choose a game and play.</p>
+      <p>Board classics, 3D battles, space shooters, racing and brain games — all running right here on a single page. No downloads, no sign-ups. Just choose a game and play.</p>
       <button class="cta" id="heroPlay">▶ Start Playing</button>
       <div class="stats">
-        <div class="stat"><strong id="statGames">7</strong><span>Games</span></div>
+        <div class="stat"><strong id="statGames">13</strong><span>Games</span></div>
         <div class="stat"><strong>3D</strong><span>Graphics</span></div>
         <div class="stat"><strong>Free</strong><span>Forever</span></div>
       </div>
@@ -185,6 +194,7 @@
     <div class="section-title" id="gamesTitle">
       <h2>🕹️ All Games</h2><span>Tap a card to play instantly</span>
     </div>
+    <div class="filters" id="filters"></div>
     <main class="grid" id="grid"></main>
 
     <footer>Made with ❤️ • Best experienced in a modern browser • Use fullscreen for the best view</footer>
@@ -206,55 +216,95 @@
 </div>
 
 <script>
-/* ===== Add or edit games here. Paths are relative to this index.html ===== */
+/* =====================================================================
+   ADD / EDIT GAMES HERE.
+   Every game lives in its own folder:  foldername/index.html
+   To add a game: create the folder, then add one entry below.
+   cat = category used by the filter chips (Board, Arcade, Racing, Puzzle, Action)
+   isNew:true = shows the glowing NEW badge
+   ===================================================================== */
 const GAMES = [
-  { id:'voidstriker', title:'Void Striker',     icon:'🚀', path:'voidstriker.html',
+  /* ---- newest ---- */
+  { id:'pong', title:'Pong', icon:'🏓', path:'pong/index.html', cat:'Arcade',
+    desc:'The original paddle-and-ball duel. Keep the ball in play and outscore your opponent.',
+    tags:['Arcade','Retro','Classic'], badge:'NEW', isNew:true, c1:'#6366f1', c2:'#0ea5e9' },
+  { id:'reactiontime', title:'Reaction Time', icon:'⚡', path:'reactiontime/index.html', cat:'Action',
+    desc:'Wait for the signal, then react as fast as you can. How quick are your reflexes?',
+    tags:['Reflex','Quick Play','Skill'], badge:'NEW', isNew:true, c1:'#facc15', c2:'#f97316' },
+
+  /* ---- earlier additions ---- */
+  { id:'flappybird', title:'Flappy Bird', icon:'🐦', path:'flappybird/index.html', cat:'Arcade',
+    desc:'Tap to flap through the pipes. Simple to learn, hard to put down.',
+    tags:['Arcade','One-Tap','High Score'], badge:'ARCADE', c1:'#38bdf8', c2:'#22c55e' },
+  { id:'memorymatch', title:'Memory Match', icon:'🧠', path:'memorymatch/index.html', cat:'Puzzle',
+    desc:'Flip the cards and find all the matching pairs. A great brain workout.',
+    tags:['Puzzle','Memory','Brain Game'], badge:'BRAIN', c1:'#a855f7', c2:'#ec4899' },
+  { id:'tictactoe', title:'Tic Tac Toe', icon:'⭕', path:'tictactoe/index.html', cat:'Board',
+    desc:'The timeless X and O showdown. Challenge a friend or test your strategy.',
+    tags:['Board','Classic','Quick Play'], badge:'CLASSIC', c1:'#f59e0b', c2:'#ef4444' },
+  { id:'endlessrunner', title:'Endless Runner', icon:'🏃', path:'endlessrunner/index.html', cat:'Action',
+    desc:'Run, jump and dodge obstacles as the pace keeps rising. How far can you go?',
+    tags:['Runner','Action','High Score'], badge:'RUNNER', c1:'#14b8a6', c2:'#3b82f6' },
+
+  /* ---- original games ---- */
+  { id:'voidstriker', title:'Void Striker', icon:'🚀', path:'voidstriker/index.html', cat:'Action',
     desc:'Fast arcade space shooter. Blast enemies, dodge fire and chase a new high score.',
-    tags:['Space','Shooter','Touch Controls'], badge:'NEW', isNew:true, c1:'#00c8ff', c2:'#7c3aed' },
-  { id:'chess',   title:'3D Chess',            icon:'♟️', path:'chess.html',
+    tags:['Space','Shooter','Touch Controls'], badge:'SHOOTER', c1:'#00c8ff', c2:'#7c3aed' },
+  { id:'chess', title:'3D Chess', icon:'♟️', path:'chess/index.html', cat:'Board',
     desc:'Beautiful 3D chess board with full rules. Play locally or challenge a friend online.',
     tags:['3D','Strategy','Multiplayer'], badge:'CLASSIC', c1:'#7c5cff', c2:'#3b82f6' },
-  { id:'ludo',    title:'3D Ludo',             icon:'🎲', path:'ludo.html',
+  { id:'ludo', title:'3D Ludo', icon:'🎲', path:'ludo/index.html', cat:'Board',
     desc:'Roll the dice and race your tokens home in this colourful 3D Ludo with online play.',
     tags:['3D','Board','Multiplayer'], badge:'FAMILY', c1:'#ff9a3d', c2:'#ff3d81' },
-  { id:'snakeandladder', title:'Snakes & Ladders', icon:'🪜', path:'snakeandladder/index.html',
+  { id:'snakeandladder', title:'Snakes & Ladders', icon:'🪜', path:'snakeandladder/index.html', cat:'Board',
     desc:'Climb ladders, dodge snakes. Play vs bot or up to 4 players, with a customizable board.',
     tags:['Board','1–4 Players','Custom Board'], badge:'FUN', c1:'#10b981', c2:'#06b6d4' },
-  { id:'snake',   title:'3D Snake',            icon:'🐍', path:'snake.html',
+  { id:'snake', title:'3D Snake', icon:'🐍', path:'snake/index.html', cat:'Arcade',
     desc:'The retro favourite reborn in 3D. Eat, grow and beat your high score.',
     tags:['3D','Arcade','High Score'], badge:'ARCADE', c1:'#22c55e', c2:'#84cc16' },
-  { id:'rockpaper', title:'Rock Paper Scissors', icon:'✊', path:'rockpaper.html',
+  { id:'rockpaper', title:'Rock Paper Scissors', icon:'✊', path:'rockpaper/index.html', cat:'Action',
     desc:'An epic 3D battle version of rock-paper-scissors. Quick rounds, big action.',
     tags:['3D','Quick Play','Battle'], badge:'BATTLE', c1:'#f43f5e', c2:'#f97316' },
-  { id:'endlesscarrace', title:'Endless Car Race', icon:'🏎️', path:'endlesscarrace/index.html',
+  { id:'endlesscarrace', title:'Endless Car Race', icon:'🏎️', path:'endlesscarrace/index.html', cat:'Racing',
     desc:'Dodge traffic, grab coins and fuel, and hit the nitro. How far can you drive?',
     tags:['Racing','Arcade','Nitro'], badge:'RACING', c1:'#06b6d4', c2:'#6366f1' }
 ];
 
 const $ = id => document.getElementById(id);
 const lobby=$('lobby'), player=$('player'), frame=$('frame'), loader=$('loader');
-let current = null;
+let current = null, activeCat = 'All';
 
 function cssVars(g){ return `--c1:${g.c1};--c2:${g.c2}`; }
 
-/* build cards + tabs */
-$('grid').innerHTML = GAMES.map((g,i)=>`
-  <button class="card" data-id="${g.id}" style="${cssVars(g)};animation-delay:${i*80}ms" aria-label="Play ${g.title}">
-    <div class="thumb"><span class="emoji">${g.icon}</span><span class="badge${g.isNew?' new':''}">${g.badge}</span></div>
-    <div class="body">
-      <h3>${g.title}</h3>
-      <p>${g.desc}</p>
-      <div class="tags">${g.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
-      <div class="play">▶ Play Now</div>
-    </div>
-  </button>`).join('');
+/* ---------- cards ---------- */
+function renderCards(){
+  const list = activeCat==='All' ? GAMES : GAMES.filter(g=>g.cat===activeCat);
+  $('grid').innerHTML = list.map((g,i)=>`
+    <button class="card" data-id="${g.id}" style="${cssVars(g)};animation-delay:${i*60}ms" aria-label="Play ${g.title}">
+      <div class="thumb"><span class="emoji">${g.icon}</span><span class="badge${g.isNew?' new':''}">${g.badge}</span></div>
+      <div class="body">
+        <h3>${g.title}</h3>
+        <p>${g.desc}</p>
+        <div class="tags">${g.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+        <div class="play">▶ Play Now</div>
+      </div>
+    </button>`).join('');
+}
+
+/* ---------- filter chips (built automatically from categories) ---------- */
+function renderFilters(){
+  const cats = ['All', ...new Set(GAMES.map(g=>g.cat))];
+  $('filters').innerHTML = cats.map(c=>
+    `<button class="chip${c===activeCat?' active':''}" data-cat="${c}">${c}</button>`).join('');
+}
 
 $('tabs').innerHTML = GAMES.map(g=>
   `<button class="tab" data-id="${g.id}" style="${cssVars(g)}">${g.icon} ${g.title}</button>`).join('');
 
 $('countPill').textContent = $('statGames').textContent = GAMES.length;
+renderFilters(); renderCards();
 
-/* navigation */
+/* ---------- navigation ---------- */
 function openGame(id, push=true){
   const g = GAMES.find(x=>x.id===id); if(!g) return showLobby(push);
   current = g;
@@ -282,6 +332,8 @@ frame.addEventListener('load', ()=>{
 });
 
 document.addEventListener('click', e=>{
+  const chip = e.target.closest('.chip');
+  if(chip){ activeCat = chip.dataset.cat; renderFilters(); renderCards(); return; }
   const card = e.target.closest('.card'); if(card) return openGame(card.dataset.id);
   const tab  = e.target.closest('.tab');  if(tab)  return openGame(tab.dataset.id);
 });
