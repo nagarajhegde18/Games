@@ -7,20 +7,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  html,body{height:100%;height:100dvh;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
     font-family:'Orbitron','Segoe UI',system-ui,sans-serif;color:#fff;background:#05030f}
   body{display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 25%,#1c1145 0%,#0a0620 45%,#05030f 80%)}
-  #wrap{position:relative;width:min(100vw,150vh);aspect-ratio:3/2}
+  /* size is set by JS fit() so the whole game always stays visible */
+  #wrap{position:relative;width:900px;height:600px;flex:none}
   canvas{width:100%;height:100%;display:block;border-radius:16px;cursor:none;
     box-shadow:0 0 70px rgba(130,90,255,.45),0 0 0 2px rgba(160,130,255,.35)}
   #overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:clamp(8px,2vw,18px);text-align:center;background:rgba(5,3,15,.62);backdrop-filter:blur(6px);border-radius:16px;z-index:3}
   #overlay.hidden{display:none}
-  #title{font-size:clamp(26px,7vw,72px);font-weight:900;letter-spacing:.08em;
+  #title{font-size:clamp(24px,6vw,72px);font-weight:900;letter-spacing:.08em;
     background:linear-gradient(90deg,#00e5ff,#a855ff,#ff3d8b,#ffd000);-webkit-background-clip:text;background-clip:text;color:transparent;
     filter:drop-shadow(0 0 18px rgba(168,85,255,.7))}
-  #sub{font-size:clamp(10px,1.8vw,18px);opacity:.85;line-height:1.7;max-width:86%}
+  #sub{font-size:clamp(10px,1.6vw,18px);opacity:.85;line-height:1.7;max-width:86%}
   #btn{cursor:pointer;border:0;padding:.9em 2.4em;font:700 clamp(12px,2vw,20px) 'Orbitron',sans-serif;letter-spacing:.2em;color:#fff;
     border-radius:999px;background:linear-gradient(135deg,#7c3aed,#ec4899);box-shadow:0 0 30px rgba(236,72,153,.6);transition:transform .15s}
   #btn:hover{transform:scale(1.07)}
@@ -65,12 +66,30 @@
   ctx.setTransform(2,0,0,2,0,0);
   const overlay = document.getElementById('overlay'), btn = document.getElementById('btn');
   const $title = document.getElementById('title'), $sub = document.getElementById('sub');
+  const wrapEl = document.getElementById('wrap');
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
 
   const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
   const rand = (a,b)=>a+Math.random()*(b-a);
   const rr = (x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
     ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();};
+
+  /* ---------- Fit game to available space (fixes cut-off bottom) ---------- */
+  function fit(){
+    const parent = wrapEl.parentElement;
+    const top = Math.max(0, parent.getBoundingClientRect().top);   // space used by any site header above
+    const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    const availH = Math.max(240, vh - top - 10);
+    const availW = Math.max(240, (parent.clientWidth || window.innerWidth) - 8);
+    const scale = Math.min(availW / W, availH / H);
+    wrapEl.style.width  = Math.floor(W * scale) + 'px';
+    wrapEl.style.height = Math.floor(H * scale) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+  document.addEventListener('fullscreenchange', () => setTimeout(fit, 100));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
+  window.addEventListener('load', fit);
 
   /* ---------- Audio ---------- */
   let actx = null;
@@ -133,7 +152,7 @@
   }
   function startGame(){
     score=0;lives=3;level=0; particles=[];rings=[];texts=[];
-    loadLevel(); overlay.classList.add('hidden');
+    loadLevel(); overlay.classList.add('hidden'); fit();
   }
 
   /* ---------- Effects ---------- */
@@ -334,7 +353,7 @@
     g.addColorStop(0,'#7c3aed');g.addColorStop(.5,'#22d3ee');g.addColorStop(1,'#ec4899');
     ctx.fillStyle=g;rr(x,y,paddle.w,paddle.h,paddle.h/2);ctx.fill();
     ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,.45)';rr(x+8,y+2,paddle.w-16,5,3);ctx.fill();
-    if(laserT>0){ // laser cannons
+    if(laserT>0){
       ctx.fillStyle='#fecdd3';ctx.shadowColor='#fb7185';ctx.shadowBlur=14;
       rr(x+10,y-8,8,12,3);ctx.fill();rr(x+paddle.w-18,y-8,8,12,3);ctx.fill();
     }
@@ -481,6 +500,7 @@
   pb.addEventListener('click',()=>{initAudio();togglePause();});
 
   buildLevel();
+  fit();
   requestAnimationFrame(frame);
 })();
 </script>
