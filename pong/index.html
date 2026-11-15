@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Neon Pong</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; background: #05060f; overflow: hidden;
     font-family: "Segoe UI", system-ui, sans-serif; color: #cfe8ff; }
   body { display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -15,7 +15,7 @@
   #wrap { position: relative; width: min(94vw, 900px); aspect-ratio: 16/9;
     border-radius: 14px; box-shadow: 0 0 40px rgba(0,229,255,.25), 0 0 80px rgba(255,0,200,.15);
     border: 2px solid rgba(125,249,255,.35); overflow: hidden; }
-  canvas { width: 100%; height: 100%; display: block; background: #070a1c; }
+  canvas { width: 100%; height: 100%; display: block; background: #070a1c; touch-action: none; }
   #overlay { position: absolute; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 14px; text-align: center;
     background: rgba(5,6,15,.72); backdrop-filter: blur(3px); transition: opacity .25s; }
@@ -30,6 +30,26 @@
   button.alt { background: #ff6bea; box-shadow: 0 0 18px #ff2bd6; }
   button:hover { transform: translateY(-2px) scale(1.04); }
   .hint { margin-top: 10px; font-size: .78rem; opacity: .6; }
+
+  /* ---------- On-screen controls (touch / small screens) ---------- */
+  #controls { display: none; width: min(94vw, 900px); margin-top: 14px;
+    flex-direction: column; align-items: stretch; gap: 10px; }
+  .pad { display: flex; flex-direction: row; justify-content: space-between; width: 100%; }
+  #padR { display: none; }
+  body.two-players #padR { display: flex; }
+  .arrow { width: 72px; height: 56px; padding: 0; border-radius: 16px; font-size: 1.6rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none;
+    touch-action: none; color: #05060f; background: #00e5ff; box-shadow: 0 0 18px #00e5ff; }
+  .arrow.p2 { background: #ff2bd6; box-shadow: 0 0 18px #ff2bd6; }
+  .arrow:hover { transform: none; }
+  @media (max-width: 480px) { .arrow { width: 62px; height: 54px; } }
+  .arrow.active { transform: scale(.93); filter: brightness(1.3); }
+  #midHint { display: none; font-size: .75rem; opacity: .55; text-align: center; padding: 0 8px; }
+  @media (pointer: coarse), (max-width: 700px) {
+    #controls { display: flex; }
+    .hint { display: none; }
+    h1 { margin-bottom: 8px; }
+  }
 </style>
 </head>
 <body>
@@ -40,12 +60,25 @@
     <h2 id="title">NEON PONG</h2>
     <p id="sub">
       Player 1: <b>W / S</b> &nbsp;|&nbsp; Player 2: <b>↑ / ↓</b><br>
-      Mouse / touch also moves your left paddle &nbsp;|&nbsp; <b>P</b> pause &nbsp;|&nbsp; First to 7 wins
+      Mouse / touch / on-screen arrows move your paddle &nbsp;|&nbsp; <b>P</b> pause &nbsp;|&nbsp; First to 7 wins
     </p>
     <div class="btns">
       <button id="b1">1 PLAYER (vs AI)</button>
       <button id="b2" class="alt">2 PLAYERS</button>
     </div>
+  </div>
+</div>
+
+<!-- Touch arrows: up on top, down below -->
+<div id="controls">
+  <div class="pad" id="padL">
+    <button class="arrow" data-pad="p1up" aria-label="Player 1 up">▲</button>
+    <button class="arrow" data-pad="p1down" aria-label="Player 1 down">▼</button>
+  </div>
+  <div id="midHint">Hold ▲ / ▼ to move</div>
+  <div class="pad" id="padR">
+    <button class="arrow p2" data-pad="p2up" aria-label="Player 2 up">▲</button>
+    <button class="arrow p2" data-pad="p2down" aria-label="Player 2 down">▼</button>
   </div>
 </div>
 <div class="hint">Tip: press SPACE to start / restart</div>
@@ -72,6 +105,7 @@
   let shake = 0;
   let particles = [], trail = [];
   const keys = {};
+  const pad = { p1up: false, p1down: false, p2up: false, p2down: false };
 
   const p1 = { x: 40, y: H/2 - PADDLE_H/2, vy: 0 };
   const p2 = { x: W - 40 - PADDLE_W, y: H/2 - PADDLE_H/2, vy: 0 };
@@ -113,6 +147,7 @@
 
   function startGame(m) {
     mode = m; score = [0, 0];
+    document.body.classList.toggle('two-players', mode === 2);
     p1.y = p2.y = H/2 - PADDLE_H/2;
     particles = []; resetBall();
     state = 'playing';
@@ -145,17 +180,36 @@
   canvas.addEventListener('mousemove', e => pointerMove(e.clientY));
   canvas.addEventListener('touchmove', e => { pointerMove(e.touches[0].clientY); e.preventDefault(); }, { passive: false });
 
+  // On-screen arrow buttons (hold to move)
+  document.querySelectorAll('.arrow').forEach(btn => {
+    const name = btn.dataset.pad;
+    const press = e => { e.preventDefault(); pad[name] = true; btn.classList.add('active'); };
+    const release = e => { e.preventDefault(); pad[name] = false; btn.classList.remove('active'); };
+    btn.addEventListener('pointerdown', e => { btn.setPointerCapture?.(e.pointerId); press(e); });
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('lostpointercapture', release);
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+  });
+  // Safety: release everything if the page loses focus
+  addEventListener('blur', () => {
+    Object.keys(pad).forEach(k => pad[k] = false);
+    document.querySelectorAll('.arrow.active').forEach(b => b.classList.remove('active'));
+  });
+
   document.getElementById('b1').onclick = () => startGame(1);
   document.getElementById('b2').onclick = () => startGame(2);
 
   // ---------- Update ----------
   function update(dt) {
-    // Paddle input
-    p1.vy = ((keys['s'] ? 1 : 0) - (keys['w'] ? 1 : 0)) * PADDLE_SPEED;
+    // Paddle input (keyboard + on-screen arrows)
+    const p1Down = keys['s'] || pad.p1down, p1Up = keys['w'] || pad.p1up;
+    p1.vy = ((p1Down ? 1 : 0) - (p1Up ? 1 : 0)) * PADDLE_SPEED;
     if (p1.vy) p1.y += p1.vy * dt;
 
     if (mode === 2) {
-      p2.vy = ((keys['arrowdown'] ? 1 : 0) - (keys['arrowup'] ? 1 : 0)) * PADDLE_SPEED;
+      const p2Down = keys['arrowdown'] || pad.p2down, p2Up = keys['arrowup'] || pad.p2up;
+      p2.vy = ((p2Down ? 1 : 0) - (p2Up ? 1 : 0)) * PADDLE_SPEED;
       p2.y += p2.vy * dt;
     } else {
       // Simple AI with reaction delay & error
@@ -242,7 +296,7 @@
     bg.addColorStop(0, '#0a0d26'); bg.addColorStop(1, '#05060f');
     ctx.fillStyle = bg; ctx.fillRect(-20, -20, W + 40, H + 40);
 
-    // Perspective-ish grid
+    // Grid
     ctx.strokeStyle = 'rgba(0,229,255,.06)'; ctx.lineWidth = 1;
     for (let x = 0; x <= W; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
     for (let y = 0; y <= H; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
@@ -309,7 +363,6 @@
     last = now;
     if (state === 'playing') update(dt);
     else {
-      // keep particles animating on menu/over
       particles.forEach(p => { p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt; });
       particles = particles.filter(p => p.life > 0);
     }

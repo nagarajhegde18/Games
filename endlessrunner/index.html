@@ -8,26 +8,32 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;background:#0b1020;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;overflow:hidden;touch-action:none}
-  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-  #wrap{position:relative;width:min(96vw,960px);aspect-ratio:3/1;border-radius:16px;overflow:hidden;
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+  #wrap{position:relative;width:min(96vw,960px);border-radius:16px;overflow:hidden;
         box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 2px rgba(255,255,255,.06)}
   canvas{width:100%;height:100%;display:block}
-  #mute{position:absolute;left:10px;bottom:8px;width:34px;height:34px;border:0;border-radius:50%;
-        background:rgba(0,0,0,.35);color:#fff;font-size:16px;cursor:pointer;backdrop-filter:blur(4px)}
-  #mute:hover{background:rgba(0,0,0,.55)}
+  #mute{width:42px;height:42px;border:0;border-radius:50%;background:rgba(255,255,255,.14);
+        color:#fff;font-size:18px;cursor:pointer}
+  #mute:hover{background:rgba(255,255,255,.25)}
   .hint{opacity:.65;font-size:14px;text-align:center;padding:0 12px}
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="c"></canvas>
-  <button id="mute" tabindex="-1" title="Mute (M)">🔊</button>
 </div>
 <div class="hint">SPACE / ↑ / Tap = Jump &nbsp;•&nbsp; ↓ / Hold bottom of screen = Duck &nbsp;•&nbsp; R = Restart &nbsp;•&nbsp; M = Mute</div>
+<button id="mute" tabindex="-1" title="Mute (M)">🔊</button>
 
 <script>
 (() => {
-  const W = 900, H = 300, GROUND = 250;
+  // Square, zoomed-in layout on phones / portrait; wide layout on desktop
+  const PORTRAIT = innerWidth < 700 || innerHeight > innerWidth;
+  const W = PORTRAIT ? 420 : 900, H = PORTRAIT ? 420 : 300, GROUND = PORTRAIT ? 340 : 250;
+  const wrap = document.getElementById('wrap');
+  wrap.style.aspectRatio = W + '/' + H;
+  if (PORTRAIT) wrap.style.width = 'min(96vw,62vh,520px)';
+
   const DJ_MAX = 720; // double-jump duration in frames (~12s)
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
@@ -52,6 +58,7 @@
     if (!muted) { initAudio(); sfx.pickup(); }
   }
   muteBtn.addEventListener('click', () => { toggleMute(); muteBtn.blur(); });
+  muteBtn.addEventListener('pointerdown', e => e.stopPropagation());
 
   function initAudio() {
     if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
@@ -104,7 +111,7 @@
                  shield: false, djTime: 0, jumps: 0, inv: 0 };
   let obstacles = [], particles = [], powerups = [], floaters = [];
 
-  const stars = Array.from({ length: 70 }, () => ({ x: rand(0, W), y: rand(0, 150), r: rand(0.4, 1.6), tw: rand(0, 6) }));
+  const stars = Array.from({ length: 70 }, () => ({ x: rand(0, W), y: rand(0, GROUND * 0.6), r: rand(0.4, 1.6), tw: rand(0, 6) }));
   const clouds = Array.from({ length: 6 }, () => ({ x: rand(0, W), y: rand(20, 110), s: rand(0.6, 1.3), sp: rand(0.15, 0.4) }));
   const pebbles = Array.from({ length: 40 }, () => ({ x: rand(0, W), y: rand(GROUND + 8, H - 6), w: rand(2, 8) }));
 
@@ -301,16 +308,18 @@
     });
     ctx.globalAlpha = 1;
 
+    const sx = W * 0.78;
     const sy = 70 + (1 - d) * 170;
-    const sg = ctx.createRadialGradient(700, sy, 4, 700, sy, 70);
+    const sg = ctx.createRadialGradient(sx, sy, 4, sx, sy, 70);
     sg.addColorStop(0, `rgba(255,240,180,${d})`); sg.addColorStop(1, 'rgba(255,200,100,0)');
-    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(700, sy, 70, 0, 7); ctx.fill();
-    ctx.fillStyle = `rgba(255,248,210,${d})`; ctx.beginPath(); ctx.arc(700, sy, 24, 0, 7); ctx.fill();
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, 70, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(255,248,210,${d})`; ctx.beginPath(); ctx.arc(sx, sy, 24, 0, 7); ctx.fill();
 
+    const mx = W * 0.21;
     const my = 70 + d * 170;
-    ctx.fillStyle = `rgba(235,240,255,${1 - d})`; ctx.beginPath(); ctx.arc(190, my, 20, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(235,240,255,${1 - d})`; ctx.beginPath(); ctx.arc(mx, my, 20, 0, 7); ctx.fill();
     ctx.fillStyle = mix([8, 12, 38], [86, 170, 255], d); ctx.globalAlpha = 1 - d;
-    ctx.beginPath(); ctx.arc(198, my - 4, 17, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(mx + 8, my - 4, 17, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     return d;
   }
 
@@ -521,16 +530,17 @@
     ctx.fillStyle = 'rgba(5,8,24,.45)'; ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
     ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 12;
+    const cy = H / 2;
     if (state === 'ready') {
-      ctx.font = '800 46px "Segoe UI",system-ui,sans-serif'; ctx.fillText('🦖 DINO RUN', W / 2, 112);
-      ctx.font = '500 18px "Segoe UI",system-ui,sans-serif'; ctx.fillText('Press SPACE or tap to start', W / 2, 150);
+      ctx.font = '800 46px "Segoe UI",system-ui,sans-serif'; ctx.fillText('🦖 DINO RUN', W / 2, cy - 38);
+      ctx.font = '500 18px "Segoe UI",system-ui,sans-serif'; ctx.fillText('Press SPACE or tap to start', W / 2, cy);
       ctx.font = '600 15px "Segoe UI",system-ui,sans-serif';
-      ctx.fillStyle = '#4cc9f0'; ctx.fillText('Blue orb = Shield (blocks one hit)', W / 2, 184);
-      ctx.fillStyle = '#ffd23f'; ctx.fillText('Gold orb = Double Jump (12 seconds)', W / 2, 206);
+      ctx.fillStyle = '#4cc9f0'; ctx.fillText('Blue orb = Shield (blocks one hit)', W / 2, cy + 34);
+      ctx.fillStyle = '#ffd23f'; ctx.fillText('Gold orb = Double Jump (12 seconds)', W / 2, cy + 56);
     } else {
-      ctx.font = '800 46px "Segoe UI",system-ui,sans-serif'; ctx.fillText('GAME OVER', W / 2, 115);
-      ctx.font = '600 20px "Segoe UI",system-ui,sans-serif'; ctx.fillText(`Score ${score}   •   Best ${hi}`, W / 2, 152);
-      ctx.font = '500 16px "Segoe UI",system-ui,sans-serif'; ctx.fillText('SPACE / tap / R to restart', W / 2, 184);
+      ctx.font = '800 46px "Segoe UI",system-ui,sans-serif'; ctx.fillText('GAME OVER', W / 2, cy - 35);
+      ctx.font = '600 20px "Segoe UI",system-ui,sans-serif'; ctx.fillText(`Score ${score}   •   Best ${hi}`, W / 2, cy + 2);
+      ctx.font = '500 16px "Segoe UI",system-ui,sans-serif'; ctx.fillText('SPACE / tap / R to restart', W / 2, cy + 34);
     }
     ctx.shadowBlur = 0;
   }
