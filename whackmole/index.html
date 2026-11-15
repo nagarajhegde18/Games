@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Whack-a-Mole</title>
+<style>
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:#6ec6ff;
+  font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;font-weight:800;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none;overscroll-behavior:none}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;overflow:hidden;
+  background:linear-gradient(#2f9bf0 0%,#8fd8ff 42%,#dff5ff 60%)}
+
+/* ---------- scenery ---------- */
+.sun{position:absolute;top:7%;right:9%;width:72px;height:72px;border-radius:50%;
+  background:radial-gradient(circle,#fffbc8,#ffd93b 60%,#ffb800);
+  box-shadow:0 0 40px 18px rgba(255,220,80,.55);animation:pulse 4s ease-in-out infinite}
+.cloud{position:absolute;width:110px;height:34px;background:#fff;border-radius:40px;opacity:.92;
+  animation:drift linear infinite;left:-160px}
+.cloud::before,.cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
+.cloud::before{width:50px;height:50px;top:-24px;left:18px}
+.cloud::after{width:38px;height:38px;top:-16px;left:56px}
+.c1{top:14%;animation-duration:42s}
+.c2{top:26%;transform:scale(.7);animation-duration:60s;animation-delay:-20s}
+.c3{top:8%;transform:scale(1.2);animation-duration:75s;animation-delay:-45s}
+.hills{position:absolute;left:0;right:0;bottom:34%;height:26%;
+  background:
+   radial-gradient(ellipse 60% 100% at 18% 100%,#6cc94a 0 98%,transparent 100%),
+   radial-gradient(ellipse 70% 125% at 78% 100%,#58b43a 0 98%,transparent 100%)}
+.ground{position:absolute;left:0;right:0;bottom:0;height:64%;
+  background:
+   repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 14px,transparent 14px 28px),
+   linear-gradient(#6fcf47,#44a02c 55%,#2f7d1f)}
+
+/* ---------- HUD ---------- */
+.hud{display:flex;gap:10px;width:min(94vw,480px);z-index:5;
+  padding:max(10px,env(safe-area-inset-top)) 0 6px}
+.pill{flex:1;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.55);border-radius:16px;
+  padding:6px 8px;text-align:center;color:#fff;backdrop-filter:blur(4px)}
+.pill small{display:block;font-size:10px;letter-spacing:2px;opacity:.85}
+.pill b{font-size:26px;display:inline-block;text-shadow:0 2px 0 rgba(0,0,0,.35)}
+.pop{animation:pop .25s}
+.bar{width:min(94vw,480px);height:14px;background:rgba(0,0,0,.3);border-radius:9px;overflow:hidden;
+  z-index:5;border:2px solid rgba(255,255,255,.55)}
+#barfill{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffd93b,#ff8a00);
+  transition:width .1s linear}
+#app.low #barfill{background:linear-gradient(90deg,#ff7a7a,#ff2b2b)}
+#app.low #time{color:#ffd0d0;animation:pop .5s infinite}
+.combo{height:36px;margin-top:6px;z-index:5;color:#fff;font-size:22px;letter-spacing:1px;opacity:0;
+  text-shadow:0 2px 0 #c2410c,0 0 12px rgba(255,140,0,.9)}
+.combo.on{opacity:1;animation:pop .25s}
+
+/* ---------- board ---------- */
+.field{flex:1;display:flex;align-items:center;justify-content:center;width:100%;z-index:4;margin-top:-20px}
+.board{--bs:min(94vw,50vh,470px);width:var(--bs);display:grid;grid-template-columns:repeat(3,1fr);gap:1.5%}
+.hole{position:relative;aspect-ratio:1/1;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pit{position:absolute;left:3%;width:94%;bottom:8%;height:34%;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 30%,#000 0,#1a0b03 55%,#3d2008 100%);
+  box-shadow:0 5px 0 #8a5a2b,0 9px 10px rgba(0,0,0,.35),inset 0 8px 14px rgba(0,0,0,.8)}
+.clip{position:absolute;left:0;right:0;top:0;bottom:25%;overflow:hidden;z-index:2}
+.lip{position:absolute;left:1%;width:98%;bottom:6%;height:38%;z-index:3;border-radius:50%;
+  background:linear-gradient(#4a2a0c 50%,#4a2a0c 54%,#b07a43 54%,#7b4d22 80%,#5c3817 100%);
+  clip-path:inset(50% -5% -5% -5%)}
+
+/* ---------- mole ---------- */
+.mole{--b1:#b2733a;--b2:#6a3c14;--muz:#e8b98a;position:absolute;left:19%;bottom:0;width:62%;
+  aspect-ratio:1/1.1;transform:translateY(114%);transition:transform .17s cubic-bezier(.2,1.5,.4,1)}
+.mole.up,.bomb.up{transform:translateY(0)}
+.mole i{position:absolute;display:block}
+.sq{position:absolute;inset:0;transform-origin:50% 100%}
+.mole.hit .sq{animation:squash .3s forwards}
+.mole .body{position:absolute;inset:0;border-radius:48% 48% 38% 38%/55% 55% 45% 45%;
+  background:radial-gradient(circle at 35% 25%,var(--b1),var(--b2) 78%);
+  box-shadow:inset -6px -8px 14px rgba(0,0,0,.35),inset 4px 4px 8px rgba(255,255,255,.28)}
+.ear{top:-3%;width:22%;height:22%;border-radius:50%;
+  background:radial-gradient(circle at 50% 58%,#f2a3ab 0 34%,var(--b2) 38%)}
+.ear.l{left:9%}.ear.r{right:9%}
+.muz{left:24%;top:46%;width:52%;height:38%;border-radius:50%;
+  background:radial-gradient(circle at 50% 30%,#f6d6b0,var(--muz));box-shadow:inset 0 -3px 6px rgba(0,0,0,.18)}
+.eye{top:27%;width:19%;height:21%;border-radius:50%;background:#fff;
+  box-shadow:inset 0 -3px 4px rgba(0,0,0,.15),0 1px 3px rgba(0,0,0,.35)}
+.eye.l{left:22%}.eye.r{right:22%}
+.eye i{left:30%;top:26%;width:48%;height:58%;border-radius:50%;background:#111}
+.eye i::after{content:"";position:absolute;left:22%;top:14%;width:34%;height:30%;border-radius:50%;background:#fff}
+.mole.up .eye{animation:blink 2.6s infinite}
+.mole.hit .eye i{display:none}
+.mole.hit .eye{animation:none;
+  background:linear-gradient(45deg,transparent 40%,#d40000 40% 60%,transparent 60%),
+             linear-gradient(-45deg,transparent 40%,#d40000 40% 60%,transparent 60%),#fff}
+.cheek{top:55%;width:14%;height:9%;border-radius:50%;background:rgba(255,100,135,.5)}
+.cheek.l{left:14%}.cheek.r{right:14%}
+.nose{left:50%;top:44%;width:22%;height:14%;margin-left:-11%;border-radius:50% 50% 60% 60%;
+  background:radial-gradient(circle at 35% 30%,#ffa7b9,#c2415f)}
+.teeth{left:50%;top:65%;width:15%;height:16%;margin-left:-7.5%;background:#fff;
+  border:2px solid #7a3b1a;border-top:0;border-radius:0 0 5px 5px}
+.paw{top:77%;width:20%;height:15%;border-radius:50%;background:var(--b1);
+  box-shadow:inset 0 -3px 4px rgba(0,0,0,.3)}
+.paw.l{left:8%}.paw.r{right:8%}
+.stars{position:absolute;top:-2%;left:0;right:0;text-align:center;display:none;
+  font-size:clamp(16px,5vw,26px);animation:wob .35s infinite alternate}
+.mole.hit .stars{display:block}
+.mole.gold{--b1:#ffe27a;--b2:#d49a12;--muz:#fff2b8;filter:drop-shadow(0 0 8px #ffd400)}
+.mole.gold::before{content:"👑";position:absolute;top:-17%;left:50%;transform:translateX(-50%);
+  font-size:clamp(14px,4.5vw,24px);z-index:5}
+
+/* ---------- bomb ---------- */
+.bomb{position:absolute;left:21%;bottom:0;width:58%;aspect-ratio:1/1.05;
+  transform:translateY(114%);transition:transform .17s cubic-bezier(.2,1.5,.4,1);
+  filter:drop-shadow(0 0 6px rgba(255,40,40,.7))}
+.bomb i{position:absolute;display:block}
+.ball{position:absolute;left:0;right:0;bottom:0;height:86%;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,#7a7a7a,#1a1a1a 55%,#000);
+  box-shadow:inset -6px -8px 12px rgba(0,0,0,.6)}
+.shine{left:20%;top:16%;width:22%;height:14%;border-radius:50%;background:rgba(255,255,255,.55);
+  transform:rotate(-30deg)}
+.fuse{left:50%;top:7%;width:6%;height:17%;background:#c8a15a;border-radius:3px;
+  transform:translateX(-50%) rotate(18deg)}
+.spark{left:56%;top:-4%;width:17%;aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(#fff,#ffd93b 40%,#ff6a00 70%,transparent 72%);
+  animation:flick .15s infinite alternate}
+.boomfx{display:none;position:absolute;inset:0;align-items:center;justify-content:center;
+  font-size:clamp(34px,11vw,64px)}
+.bomb.boom .ball,.bomb.boom i{opacity:0}
+.bomb.boom .boomfx{display:flex;animation:boom .45s forwards}
+.hole[data-t=bomb] .mole{display:none}
+.hole:not([data-t=bomb]) .bomb{display:none}
+
+/* ---------- effects ---------- */
+#fx{position:fixed;inset:0;pointer-events:none;z-index:40}
+.p{position:absolute;font-size:18px;animation:pf .6s ease-out forwards}
+.float{position:absolute;font-size:28px;font-weight:900;white-space:nowrap;
+  text-shadow:0 3px 0 rgba(0,0,0,.45),0 0 10px rgba(255,255,255,.6);
+  transform:translate(-50%,-50%);animation:fl .9s ease-out forwards}
+#flash{position:fixed;inset:0;background:rgba(255,0,0,.45);opacity:0;pointer-events:none;
+  z-index:30;transition:opacity .3s}
+#flash.on{opacity:1;transition:none}
+#app.shake .field{animation:shake .4s}
+#hammer{position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:50}
+#hammer .tool{position:absolute;left:-40px;top:-22px;width:80px;height:132px;transform-origin:50% 17%;opacity:0}
+#hammer .tool.swing{animation:swing .38s forwards}
+#hammer i{position:absolute;display:block}
+.hd{left:0;top:0;width:80px;height:44px;border-radius:10px;
+  background:linear-gradient(#f0f0f0,#a0a0a0 55%,#6b6b6b);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.7),0 5px 8px rgba(0,0,0,.4)}
+.hl{left:32px;top:38px;width:16px;height:94px;border-radius:8px;z-index:-1;
+  background:linear-gradient(90deg,#d29858,#8a5524 60%,#6b3f18)}
+
+/* ---------- overlay ---------- */
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:20;
+  background:rgba(10,30,60,.55);backdrop-filter:blur(5px)}
+#overlay.hidden{display:none}
+.card{background:linear-gradient(#fff6dc,#ffe1a1);border:5px solid #8a5a2b;border-radius:26px;
+  padding:20px 22px 24px;width:min(88vw,380px);text-align:center;color:#5a3410;
+  box-shadow:0 10px 0 #5c3817,0 24px 40px rgba(0,0,0,.45);
+  animation:drop .5s cubic-bezier(.2,1.4,.4,1)}
+.logo{font-size:52px;line-height:1.1}
+.card h1{margin:4px 0 2px;font-size:30px;letter-spacing:1px;color:#b4531b;text-shadow:0 2px 0 #fff}
+.sub{margin:0 0 10px;font-size:15px;opacity:.85}
+.rules{list-style:none;margin:0 0 14px;padding:0;text-align:left;font-size:15px}
+.rules li{background:rgba(255,255,255,.55);border-radius:12px;margin:6px 0;padding:6px 10px}
+.rules span{display:inline-block;width:28px}
+.big{font-size:64px;color:#e0531b;text-shadow:0 3px 0 #fff;line-height:1.1}
+.stat{margin:4px 0 14px;font-size:15px}
+.btn{font:inherit;font-size:24px;color:#fff;background:linear-gradient(#5fe04a,#2fae22);border:0;
+  border-radius:18px;padding:12px 34px;cursor:pointer;letter-spacing:1px;
+  box-shadow:0 6px 0 #1b7a14,0 10px 16px rgba(0,0,0,.3);text-shadow:0 2px 0 rgba(0,0,0,.3)}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #1b7a14}
+#mute{position:absolute;right:10px;bottom:max(12px,env(safe-area-inset-bottom));z-index:10;width:46px;height:46px;
+  border-radius:50%;border:2px solid rgba(255,255,255,.7);background:rgba(0,0,0,.35);
+  font-size:22px;cursor:pointer;color:#fff}
+
+/* ---------- keyframes ---------- */
+@keyframes drift{to{transform:translateX(calc(100vw + 340px))}}
+@keyframes pulse{50%{transform:scale(1.07)}}
+@keyframes pop{50%{transform:scale(1.3)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes squash{0%{transform:scale(1,1)}35%{transform:scale(1.18,.62)}100%{transform:scale(1.08,.78)}}
+@keyframes wob{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}
+@keyframes flick{to{transform:scale(1.35);opacity:.8}}
+@keyframes boom{0%{transform:scale(.3)}60%{transform:scale(1.4)}100%{transform:scale(1.1);opacity:0}}
+@keyframes pf{to{transform:translate(var(--dx),var(--dy)) rotate(260deg) scale(.3);opacity:0}}
+@keyframes fl{to{transform:translate(-50%,-190%);opacity:0}}
+@keyframes shake{0%,100%{transform:translate(0)}20%{transform:translate(-9px,4px)}
+  40%{transform:translate(8px,-5px)}60%{transform:translate(-6px,3px)}80%{transform:translate(5px,-2px)}}
+@keyframes swing{0%{opacity:1;transform:rotate(-65deg) translateY(-14px)}
+  35%{opacity:1;transform:rotate(12deg) scale(1.08)}70%{opacity:1;transform:rotate(8deg)}
+  100%{opacity:0;transform:rotate(8deg)}}
+@keyframes drop{from{transform:translateY(-60px) scale(.85);opacity:0}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="sun"></div>
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+  <div class="hills"></div><div class="ground"></div>
+
+  <header class="hud">
+    <div class="pill"><small>SCORE</small><b id="score">0</b></div>
+    <div class="pill"><small>TIME</small><b id="time">60</b></div>
+    <div class="pill"><small>BEST</small><b id="best">0</b></div>
+  </header>
+  <div class="bar"><i id="barfill"></i></div>
+  <div class="combo" id="combo"></div>
+
+  <main class="field" id="field"><div class="board" id="board"></div></main>
+
+  <button id="mute" aria-label="Toggle sound">🔊</button>
+  <div id="fx"></div>
+  <div id="flash"></div>
+  <div id="hammer"><div class="tool" id="tool"><i class="hd"></i><i class="hl"></i></div></div>
+  <div id="overlay"></div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const TOTAL = 60;                       // seconds
+  const store = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+  };
+
+  /* ---------- sound (WebAudio, no files needed) ---------- */
+  let ac = null, muted = false;
+  function audio(){
+    if(!ac){ try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+    if(ac && ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(f, d, type='sine', vol=.2, slide=0, delay=0){
+    if(muted) return; const a = audio(); if(!a) return;
+    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + .02);
+  }
+  function noise(d, vol){
+    if(muted) return; const a = audio(); if(!a) return;
+    const n = a.sampleRate * d | 0, b = a.createBuffer(1, n, a.sampleRate), ch = b.getChannelData(0);
+    for(let i=0;i<n;i++) ch[i] = (Math.random()*2-1) * (1 - i/n);
+    const s = a.createBufferSource(), g = a.createGain(); g.gain.value = vol;
+    s.buffer = b; s.connect(g); g.connect(a.destination); s.start();
+  }
+  const sfx = {
+    pop(){ tone(280, .12, 'sine', .1, 520); },
+    whack(){ noise(.12, .3); tone(200, .15, 'square', .18, -130); },
+    gold(){ [660,880,1320].forEach((f,i)=>tone(f,.18,'triangle',.2,0,i*.08)); },
+    bomb(){ noise(.55, .45); tone(130, .5, 'sawtooth', .3, -90); },
+    miss(){ tone(150, .08, 'sine', .08); },
+    start(){ [440,554,659].forEach((f,i)=>tone(f,.15,'triangle',.18,0,i*.09)); },
+    end(){ [523,440,349,262].forEach((f,i)=>tone(f,.25,'triangle',.2,0,i*.15)); }
+  };
+
+  /* ---------- build the board ---------- */
+  const MOLE = `<div class="mole"><div class="sq">
+    <i class="ear l"></i><i class="ear r"></i><div class="body"></div><i class="muz"></i>
+    <i class="eye l"><i></i></i><i class="eye r"><i></i></i>
+    <i class="cheek l"></i><i class="cheek r"></i><i class="nose"></i><i class="teeth"></i>
+    <i class="paw l"></i><i class="paw r"></i></div><span class="stars">💫</span></div>`;
+  const BOMB = `<div class="bomb"><div class="ball"><i class="shine"></i></div>
+    <i class="fuse"></i><i class="spark"></i><span class="boomfx">💥</span></div>`;
+
+  const board = $('#board'), holes = [];
+  for(let i=0;i<9;i++){
+    const el = document.createElement('div');
+    el.className = 'hole';
+    el.innerHTML = `<div class="pit"></div><div class="clip">${MOLE}${BOMB}</div><div class="lip"></div>`;
+    board.appendChild(el);
+    holes.push({ el, mole: el.querySelector('.mole'), bomb: el.querySelector('.bomb'),
+                 state: 'idle', type: 'mole', t: null });
+  }
+
+  /* ---------- state ---------- */
+  let score=0, combo=0, maxCombo=0, hits=0, running=false;
+  let best = +(store.get('wam_best') || 0);
+  let startAt=0, endAt=0, spawnT=null, tickT=null, hiddenAt=0;
+  $('#best').textContent = best;
+
+  const mult = () => Math.min(5, 1 + Math.floor(combo / 5));
+  function setScore(v){
+    score = Math.max(0, v);
+    const s = $('#score'); s.textContent = score;
+    s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop');
+  }
+  function updateCombo(){
+    const c = $('#combo');
+    if(combo >= 3){
+      c.textContent = `🔥 ${combo} COMBO` + (mult() > 1 ? `  ×${mult()}` : '');
+      c.classList.remove('on'); void c.offsetWidth; c.classList.add('on');
+    } else c.classList.remove('on');
+  }
+
+  /* ---------- effects ---------- */
+  function burst(x, y, chars, colors){
+    const fx = $('#fx');
+    for(let i=0;i<9;i++){
+      const p = document.createElement('span'); p.className = 'p';
+      p.textContent = chars[i % chars.length];
+      const a = Math.random()*Math.PI*2, d = 40 + Math.random()*50;
+      p.style.cssText = `left:${x}px;top:${y}px;color:${colors[i % colors.length]};` +
+        `--dx:${Math.cos(a)*d}px;--dy:${Math.sin(a)*d - 20}px`;
+      fx.appendChild(p); setTimeout(() => p.remove(), 650);
+    }
+  }
+  function floatText(x, y, text, color){
+    const d = document.createElement('div'); d.className = 'float'; d.textContent = text;
+    d.style.cssText = `left:${x}px;top:${y}px;color:${color}`;
+    $('#fx').appendChild(d); setTimeout(() => d.remove(), 950);
+  }
+  function swingHammer(x, y){
+    const h = $('#hammer'), t = $('#tool');
+    h.style.transform = `translate(${x}px,${y}px)`;
+    t.classList.remove('swing'); void t.offsetWidth; t.classList.add('swing');
+  }
+  function shake(){
+    const a = $('#app'); a.classList.remove('shake'); void a.offsetWidth; a.classList.add('shake');
+    const f = $('#flash'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 60);
+  }
+  const vib = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} };
+
+  /* ---------- mole logic ---------- */
+  function show(h, type, ms){
+    h.state = 'up'; h.type = type;
+    h.el.dataset.t = type;
+    h.mole.classList.toggle('gold', type === 'gold');
+    void h.el.offsetWidth;                       // so the pop-up transition plays
+    (type === 'bomb' ? h.bomb : h.mole).classList.add('up');
+    sfx.pop();
+    h.t = setTimeout(() => hide(h, true), ms);
+  }
+  function hide(h, escaped){
+    clearTimeout(h.t);
+    const wasUp = h.state === 'up';
+    h.state = 'leaving';
+    h.mole.classList.remove('up'); h.bomb.classList.remove('up');
+    if(escaped && wasUp && h.type !== 'bomb'){ combo = 0; updateCombo(); }
+    setTimeout(() => {
+      h.mole.classList.remove('hit','gold'); h.bomb.classList.remove('boom');
+      h.el.removeAttribute('data-t'); h.state = 'idle';
+    }, 280);
+  }
+
+  function spawn(el){
+    const free = holes.filter(h => h.state === 'idle'); if(!free.length) return;
+    const h = free[Math.random()*free.length | 0], r = Math.random();
+    let type = 'mole';
+    if(el > 8 && r < .13) type = 'bomb'; else if(r > .93) type = 'gold';
+    const up = Math.max(480, 1150 - el*13) * (type === 'gold' ? .8 : 1) * (.85 + Math.random()*.3);
+    show(h, type, up);
+  }
+  function spawnLoop(){
+    if(!running) return;
+    const el = (performance.now() - startAt) / 1000;
+    const n = (el > 25 && Math.random() < .45) ? 2 : 1;
+    for(let i=0;i<n;i++) spawn(el);
+    const gap = Math.max(380, 950 - el*11);
+    spawnT = setTimeout(spawnLoop, gap * (.75 + Math.random()*.5));
+  }
+
+  function whack(h, x, y){
+    if(h.state !== 'up'){ combo = 0; updateCombo(); sfx.miss(); return; }
+    clearTimeout(h.t); h.state = 'hit';
+    if(h.type === 'bomb'){
+      h.bomb.classList.add('boom');
+      combo = 0; updateCombo();
+      setScore(score - 25); endAt -= 2000;
+      floatText(x, y, '-25  -2s', '#ff5a5a');
+      burst(x, y, ['💥','🔥','✸'], ['#ff6a00','#ffd93b','#ff3b3b']);
+      sfx.bomb(); shake(); vib([60,40,80]);
+      h.t = setTimeout(() => hide(h, false), 450);
+      return;
+    }
+    combo++; hits++; maxCombo = Math.max(maxCombo, combo);
+    let pts;
+    if(h.type === 'gold'){
+      pts = 50 * mult(); endAt += 3000;
+      floatText(x, y, `+${pts}  +3s`, '#ffe14a');
+      burst(x, y, ['⭐','✨','★'], ['#ffe14a','#fff6a8','#ffb800']);
+      sfx.gold(); vib(40);
+    } else {
+      pts = 10 * mult();
+      floatText(x, y, `+${pts}`, '#ffffff');
+      burst(x, y, ['★','✦','●'], ['#ffd93b','#ff9f1c','#ffffff']);
+      sfx.whack(); vib(18);
+    }
+    h.mole.classList.add('hit');
+    setScore(score + pts); updateCombo();
+    h.t = setTimeout(() => hide(h, false), 380);
+  }
+
+  /* ---------- input (pointerdown = instant on mobile) ---------- */
+  $('#field').addEventListener('pointerdown', e => {
+    e.preventDefault();
+    swingHammer(e.clientX, e.clientY);
+    if(!running) return;
+    const hEl = e.target.closest('.hole');
+    if(!hEl){ combo = 0; updateCombo(); sfx.miss(); return; }
+    whack(holes[[...board.children].indexOf(hEl)], e.clientX, e.clientY);
+  });
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  $('#mute').addEventListener('click', e => {
+    muted = !muted; e.currentTarget.textContent = muted ? '🔇' : '🔊'; audio();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if(!running) return;
+    if(document.hidden) hiddenAt = performance.now();
+    else endAt += performance.now() - hiddenAt;   // don't lose time while tab hidden
+  });
+
+  /* ---------- game flow ---------- */
+  function tick(){
+    const left = (endAt - performance.now()) / 1000;
+    if(left <= 0){ $('#time').textContent = 0; $('#barfill').style.width = '0%'; end(); return; }
+    $('#time').textContent = Math.ceil(left);
+    $('#barfill').style.width = Math.min(100, left / TOTAL * 100) + '%';
+    $('#app').classList.toggle('low', left <= 10);
+  }
+  function start(){
+    audio(); sfx.start();
+    score = 0; combo = 0; maxCombo = 0; hits = 0; running = true;
+    $('#score').textContent = 0; updateCombo();
+    holes.forEach(h => { clearTimeout(h.t); h.state = 'idle'; h.mole.classList.remove('up','hit','gold');
+      h.bomb.classList.remove('up','boom'); h.el.removeAttribute('data-t'); });
+    startAt = performance.now(); endAt = startAt + TOTAL * 1000;
+    $('#overlay').classList.add('hidden');
+    clearInterval(tickT); tickT = setInterval(tick, 100); tick();
+    clearTimeout(spawnT); spawnT = setTimeout(spawnLoop, 600);
+  }
+  function end(){
+    running = false; clearInterval(tickT); clearTimeout(spawnT);
+    holes.forEach(h => { if(h.state === 'up' || h.state === 'hit') hide(h, false); });
+    $('#app').classList.remove('low'); $('#combo').classList.remove('on');
+    const isBest = score > best;
+    if(isBest){ best = score; store.set('wam_best', best); $('#best').textContent = best; }
+    sfx.end();
+    setTimeout(() => showOverlay('over', isBest), 500);
+  }
+  function showOverlay(mode, isBest){
+    const o = $('#overlay');
+    o.innerHTML = mode === 'start'
+      ? `<div class="card"><div class="logo">🔨🐹</div><h1>WHACK-A-MOLE</h1>
+         <p class="sub">Tap the moles before they hide!</p>
+         <ul class="rules">
+           <li><span>🐹</span> Mole <b>+10</b></li>
+           <li><span>👑</span> Golden mole <b>+50 · +3s</b></li>
+           <li><span>💣</span> Bomb <b>−25 · −2s</b></li>
+           <li><span>🔥</span> Every 5 hits in a row raises your <b>multiplier</b></li>
+         </ul><button class="btn" id="play">PLAY</button></div>`
+      : `<div class="card"><div class="logo">⏰</div><h1>TIME'S UP!</h1>
+         <div class="big">${score}</div>
+         <p class="stat">${isBest ? '🏆 New Best Score!' : 'Best: ' + best}<br>
+         Whacked: ${hits} · Best combo: ${maxCombo}</p>
+         <button class="btn" id="play">PLAY AGAIN</button></div>`;
+    o.classList.remove('hidden');
+  }
+  $('#overlay').addEventListener('click', e => { if(e.target.closest('#play')) start(); });
+
+  showOverlay('start');
+})();
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Game Arcade – Play All Games in One Place</title>
-<meta name="description" content="Play 13 free games in one page: Chess, Ludo, Snake, Pong, Flappy Bird, Memory Match, Reaction Time, Car Race, Void Striker and more.">
+<meta name="description" content="Play 15 free games in one page: Chess, Ludo, Snake, Breakout, Whack-a-Mole, Pong, Flappy Bird, Memory Match, Car Race, Void Striker and more.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
@@ -177,7 +177,7 @@
   <div class="wrap">
     <nav>
       <div class="logo"><i>🎮</i>GAME ARCADE</div>
-      <div class="pill">Pick a game • <b id="countPill">13</b> ready to play</div>
+      <div class="pill">Pick a game • <b id="countPill">15</b> ready to play</div>
     </nav>
 
     <header class="hero">
@@ -185,7 +185,7 @@
       <p>Board classics, 3D battles, space shooters, racing and brain games — all running right here on a single page. No downloads, no sign-ups. Just choose a game and play.</p>
       <button class="cta" id="heroPlay">▶ Start Playing</button>
       <div class="stats">
-        <div class="stat"><strong id="statGames">13</strong><span>Games</span></div>
+        <div class="stat"><strong id="statGames">15</strong><span>Games</span></div>
         <div class="stat"><strong>3D</strong><span>Graphics</span></div>
         <div class="stat"><strong>Free</strong><span>Forever</span></div>
       </div>
@@ -225,14 +225,20 @@
    ===================================================================== */
 const GAMES = [
   /* ---- newest ---- */
-  { id:'pong', title:'Pong', icon:'🏓', path:'pong/index.html', cat:'Arcade',
-    desc:'The original paddle-and-ball duel. Keep the ball in play and outscore your opponent.',
-    tags:['Arcade','Retro','Classic'], badge:'NEW', isNew:true, c1:'#6366f1', c2:'#0ea5e9' },
-  { id:'reactiontime', title:'Reaction Time', icon:'⚡', path:'reactiontime/index.html', cat:'Action',
-    desc:'Wait for the signal, then react as fast as you can. How quick are your reflexes?',
-    tags:['Reflex','Quick Play','Skill'], badge:'NEW', isNew:true, c1:'#facc15', c2:'#f97316' },
+  { id:'breakout', title:'Breakout', icon:'🧱', path:'breakout/index.html', cat:'Arcade',
+    desc:'Bounce the ball off your paddle and smash every brick. Classic arcade fun.',
+    tags:['Arcade','Retro','High Score'], badge:'NEW', isNew:true, c1:'#ec4899', c2:'#8b5cf6' },
+  { id:'whackmole', title:'Whack-a-Mole', icon:'🔨', path:'whackmole/index.html', cat:'Action',
+    desc:'Moles pop up fast. Tap or click them before they hide and beat your best score.',
+    tags:['Reflex','Mobile Friendly','Quick Play'], badge:'NEW', isNew:true, c1:'#ca8a04', c2:'#65a30d' },
 
   /* ---- earlier additions ---- */
+  { id:'pong', title:'Pong', icon:'🏓', path:'pong/index.html', cat:'Arcade',
+    desc:'The original paddle-and-ball duel. Keep the ball in play and outscore your opponent.',
+    tags:['Arcade','Retro','Classic'], badge:'RETRO', c1:'#6366f1', c2:'#0ea5e9' },
+  { id:'reactiontime', title:'Reaction Time', icon:'⚡', path:'reactiontime/index.html', cat:'Action',
+    desc:'Wait for the signal, then react as fast as you can. How quick are your reflexes?',
+    tags:['Reflex','Quick Play','Skill'], badge:'SKILL', c1:'#facc15', c2:'#f97316' },
   { id:'flappybird', title:'Flappy Bird', icon:'🐦', path:'flappybird/index.html', cat:'Arcade',
     desc:'Tap to flap through the pipes. Simple to learn, hard to put down.',
     tags:['Arcade','One-Tap','High Score'], badge:'ARCADE', c1:'#38bdf8', c2:'#22c55e' },
