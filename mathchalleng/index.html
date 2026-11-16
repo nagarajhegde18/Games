@@ -1,0 +1,342 @@
+<!-- math-challenge.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Math Challenge</title>
+<style>
+  :root{
+    --c1:#7c3aed; --c2:#06b6d4; --c3:#f43f5e; --good:#22c55e; --bad:#ef4444;
+    --glass:rgba(255,255,255,.08); --border:rgba(255,255,255,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Segoe UI',system-ui,sans-serif; color:#fff; overflow:hidden;
+    background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+    background-size:300% 300%; animation:bg 14s ease infinite;
+    display:flex; align-items:center; justify-content:center;
+  }
+  @keyframes bg{0%{background-position:0 50%}50%{background-position:100% 50%}100%{background-position:0 50%}}
+
+  .orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.45;z-index:0;animation:float 12s ease-in-out infinite}
+  .o1{width:340px;height:340px;background:var(--c1);top:-80px;left:-80px}
+  .o2{width:300px;height:300px;background:var(--c2);bottom:-80px;right:-60px;animation-delay:-4s}
+  .o3{width:220px;height:220px;background:var(--c3);top:50%;left:60%;animation-delay:-8s}
+  @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,-50px)}}
+
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:5}
+
+  .card{
+    position:relative; z-index:2; width:min(94vw,460px); padding:28px 24px;
+    background:var(--glass); border:1px solid var(--border); border-radius:28px;
+    backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+    box-shadow:0 25px 70px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2);
+    text-align:center; transition:transform .15s;
+  }
+  .card.shake{animation:shake .35s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-12px)}40%{transform:translateX(12px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
+
+  h1{font-size:2rem;font-weight:800;background:linear-gradient(90deg,var(--c2),var(--c1),var(--c3));
+     -webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:1px}
+  .sub{opacity:.7;margin:6px 0 20px;font-size:.95rem}
+  .screen{display:none}.screen.active{display:block;animation:pop .4s}
+  @keyframes pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+
+  .levels{display:grid;gap:10px;margin:18px 0}
+  .btn{
+    border:none;cursor:pointer;color:#fff;font-weight:700;font-size:1.05rem;padding:14px 18px;border-radius:16px;
+    background:linear-gradient(135deg,var(--c1),var(--c2)); box-shadow:0 8px 24px rgba(124,58,237,.45);
+    transition:transform .15s, box-shadow .15s, filter .15s;
+  }
+  .btn:hover{transform:translateY(-3px);filter:brightness(1.12)}
+  .btn:active{transform:scale(.96)}
+  .btn.alt{background:var(--glass);border:1px solid var(--border);box-shadow:none}
+  .btn small{display:block;font-weight:400;opacity:.8;font-size:.78rem;margin-top:2px}
+
+  .best{margin-top:8px;opacity:.85}
+  .best b{color:#fde047}
+
+  /* HUD */
+  .hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .stat{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:8px 14px;min-width:90px}
+  .stat span{display:block;font-size:.68rem;opacity:.65;letter-spacing:1px;text-transform:uppercase}
+  .stat b{font-size:1.3rem}
+
+  .timer-wrap{position:relative;width:130px;height:130px;margin:6px auto 12px}
+  .timer-wrap svg{transform:rotate(-90deg)}
+  .ring-bg{stroke:rgba(255,255,255,.12)}
+  .ring{stroke:url(#grad);stroke-linecap:round;transition:stroke-dashoffset .25s linear}
+  .time-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.3rem;font-weight:800}
+  .time-num.low{color:var(--bad);animation:pulse .6s infinite}
+  @keyframes pulse{50%{transform:scale(1.18)}}
+
+  .question{
+    font-size:clamp(2.4rem,11vw,3.4rem);font-weight:800;margin:8px 0 18px;min-height:70px;
+    text-shadow:0 0 28px rgba(6,182,212,.6);
+  }
+  .question.in{animation:qin .3s}
+  @keyframes qin{from{opacity:0;transform:translateY(-18px) scale(.9)}to{opacity:1;transform:none}}
+
+  input{
+    width:100%;padding:16px;font-size:1.6rem;text-align:center;font-weight:700;color:#fff;
+    background:rgba(0,0,0,.28);border:2px solid var(--border);border-radius:16px;outline:none;transition:.2s;
+  }
+  input:focus{border-color:var(--c2);box-shadow:0 0 0 4px rgba(6,182,212,.25)}
+  input.ok{border-color:var(--good);box-shadow:0 0 0 4px rgba(34,197,94,.3)}
+  input.no{border-color:var(--bad);box-shadow:0 0 0 4px rgba(239,68,68,.3)}
+  input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none}
+  input[type=number]{-moz-appearance:textfield}
+
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .pad button{padding:13px 0;font-size:1.2rem;font-weight:700;color:#fff;border:1px solid var(--border);
+    background:var(--glass);border-radius:12px;cursor:pointer;transition:.12s}
+  .pad button:active{transform:scale(.9);background:rgba(255,255,255,.2)}
+
+  .combo{height:26px;margin-top:10px;font-weight:800;color:#fde047;text-shadow:0 0 14px rgba(253,224,71,.7)}
+  .bonus{position:absolute;left:50%;top:38%;font-weight:800;font-size:1.6rem;pointer-events:none;
+    animation:rise .9s forwards;z-index:6}
+  @keyframes rise{from{opacity:1;transform:translate(-50%,0)}to{opacity:0;transform:translate(-50%,-70px)}}
+
+  .big{font-size:4rem;font-weight:800;margin:10px 0;color:#fde047;text-shadow:0 0 30px rgba(253,224,71,.6)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+  .newrec{color:#fde047;font-weight:800;animation:pulse 1s infinite;margin-bottom:6px}
+  .mute{position:fixed;top:14px;right:14px;z-index:9;width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--border);background:var(--glass);color:#fff;font-size:1.2rem;cursor:pointer;backdrop-filter:blur(8px)}
+</style>
+</head>
+<body>
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+<canvas id="fx"></canvas>
+<button class="mute" id="mute" title="Sound">🔊</button>
+
+<main class="card" id="card">
+
+  <!-- START -->
+  <section class="screen active" id="start">
+    <h1>⚡ MATH CHALLENGE</h1>
+    <p class="sub">Solve fast. Beat the clock. Build combos.</p>
+    <div class="levels">
+      <button class="btn" data-lvl="easy">🟢 Easy<small>Add & subtract · 60s</small></button>
+      <button class="btn" data-lvl="medium">🟡 Medium<small>Includes multiplication · 60s</small></button>
+      <button class="btn" data-lvl="hard">🔴 Hard<small>Big numbers, all operations · 60s</small></button>
+    </div>
+    <p class="best">🏆 High Score: <b id="bestStart">0</b></p>
+  </section>
+
+  <!-- GAME -->
+  <section class="screen" id="game">
+    <div class="hud">
+      <div class="stat"><span>Score</span><b id="score">0</b></div>
+      <div class="stat"><span>Streak</span><b id="streak">0</b></div>
+    </div>
+    <div class="timer-wrap">
+      <svg width="130" height="130" viewBox="0 0 130 130">
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#06b6d4"/><stop offset="100%" stop-color="#f43f5e"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="65" cy="65" r="56" fill="none" stroke-width="10"/>
+        <circle class="ring" id="ring" cx="65" cy="65" r="56" fill="none" stroke-width="10"
+                stroke-dasharray="351.86" stroke-dashoffset="0"/>
+      </svg>
+      <div class="time-num" id="time">60</div>
+    </div>
+    <div class="question" id="question">0 + 0</div>
+    <input id="answer" type="number" inputmode="numeric" autocomplete="off" placeholder="?">
+    <div class="pad" id="pad"></div>
+    <div class="combo" id="combo"></div>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="result">
+    <h1>⏱ TIME'S UP!</h1>
+    <div class="newrec" id="newrec" style="display:none">🎉 NEW HIGH SCORE!</div>
+    <div class="big" id="finalScore">0</div>
+    <div class="grid2">
+      <div class="stat"><span>Correct</span><b id="rCorrect">0</b></div>
+      <div class="stat"><span>Accuracy</span><b id="rAcc">0%</b></div>
+      <div class="stat"><span>Best Streak</span><b id="rStreak">0</b></div>
+      <div class="stat"><span>High Score</span><b id="rBest">0</b></div>
+    </div>
+    <button class="btn" id="again">🔁 Play Again</button>
+    <button class="btn alt" id="menu" style="margin-top:10px;width:100%">🏠 Menu</button>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const DURATION = 60, CIRC = 2 * Math.PI * 56;
+  const screens = ['start','game','result'];
+  const show = n => screens.forEach(s => $(s).classList.toggle('active', s === n));
+
+  let level='easy', score=0, streak=0, bestStreak=0, correct=0, wrong=0;
+  let timeLeft=DURATION, timerId=null, current=null, playing=false, muted=false;
+  let best = +localStorage.getItem('mc_best') || 0;
+  $('bestStart').textContent = best;
+
+  /* ---------- Sound (Web Audio, no files needed) ---------- */
+  let ac;
+  function beep(freq, dur=.12, type='sine', vol=.15, when=0){
+    if(muted) return;
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ac.currentTime + when);
+    g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + when + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(ac.currentTime + when); o.stop(ac.currentTime + when + dur);
+  }
+  const sndOk = () => { beep(660,.1,'triangle'); beep(990,.14,'triangle',.15,.08); };
+  const sndNo = () => beep(140,.3,'sawtooth',.18);
+  const sndTick = () => beep(880,.06,'square',.06);
+  const sndEnd = () => [523,659,784,1047].forEach((f,i)=>beep(f,.25,'triangle',.18,i*.12));
+  $('mute').onclick = () => { muted = !muted; $('mute').textContent = muted ? '🔇' : '🔊'; };
+
+  /* ---------- Question generator ---------- */
+  const rnd = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+  function makeQuestion(){
+    let ops, a, b, op, ans, text;
+    if(level==='easy'){ ops=['+','-']; }
+    else if(level==='medium'){ ops=['+','-','×']; }
+    else { ops=['+','-','×','÷']; }
+    op = ops[rnd(0,ops.length-1)];
+
+    const max = level==='easy' ? 20 : level==='medium' ? 50 : 100;
+    if(op==='+'){ a=rnd(2,max); b=rnd(2,max); ans=a+b; }
+    else if(op==='-'){ a=rnd(5,max); b=rnd(1,a); ans=a-b; }
+    else if(op==='×'){
+      const m = level==='hard' ? 15 : 12;
+      a=rnd(2,m); b=rnd(2,m); ans=a*b;
+    } else { b=rnd(2,12); ans=rnd(2,15); a=b*ans; }
+    text = `${a} ${op} ${b}`;
+    return {text, ans};
+  }
+  function nextQuestion(){
+    current = makeQuestion();
+    const q = $('question');
+    q.textContent = current.text + ' = ?';
+    q.classList.remove('in'); void q.offsetWidth; q.classList.add('in');
+    const inp = $('answer'); inp.value=''; inp.className='';
+    if(!('ontouchstart' in window)) inp.focus();
+  }
+
+  /* ---------- Game flow ---------- */
+  function start(lvl){
+    level = lvl; score=0; streak=0; bestStreak=0; correct=0; wrong=0;
+    timeLeft = DURATION; playing = true;
+    $('score').textContent = 0; $('streak').textContent = 0; $('combo').textContent='';
+    updateTimer(); show('game'); nextQuestion();
+    clearInterval(timerId);
+    timerId = setInterval(tick, 1000);
+  }
+  function tick(){
+    timeLeft--;
+    updateTimer();
+    if(timeLeft <= 10 && timeLeft > 0) sndTick();
+    if(timeLeft <= 0) end();
+  }
+  function updateTimer(){
+    $('time').textContent = timeLeft;
+    $('time').classList.toggle('low', timeLeft <= 10);
+    $('ring').style.strokeDashoffset = CIRC * (1 - timeLeft / DURATION);
+  }
+  function submit(){
+    if(!playing) return;
+    const v = $('answer').value;
+    if(v === '') return;
+    if(+v === current.ans){
+      correct++; streak++; bestStreak = Math.max(bestStreak, streak);
+      const mult = 1 + Math.floor(streak/5);          // combo multiplier every 5 streak
+      const base = level==='easy' ? 10 : level==='medium' ? 15 : 25;
+      const pts = base * mult;
+      score += pts;
+      if(streak % 5 === 0){ timeLeft = Math.min(timeLeft+3, DURATION+15); updateTimer(); floatText('+3s ⏱', '#22c55e', -40); }
+      floatText('+'+pts, '#fde047', 40);
+      $('answer').className='ok'; sndOk(); burst(false);
+      $('combo').textContent = streak>=3 ? `🔥 ${streak} streak · x${mult}` : '';
+      $('score').textContent = score; $('streak').textContent = streak;
+      setTimeout(nextQuestion, 160);
+    } else {
+      wrong++; streak=0;
+      $('answer').className='no'; sndNo();
+      $('card').classList.remove('shake'); void $('card').offsetWidth; $('card').classList.add('shake');
+      $('combo').textContent=''; $('streak').textContent=0;
+      timeLeft = Math.max(0, timeLeft-2); updateTimer(); floatText('-2s', '#ef4444', 0);
+      if(timeLeft<=0) return end();
+      setTimeout(nextQuestion, 350);
+    }
+  }
+  function end(){
+    playing=false; clearInterval(timerId); sndEnd();
+    const isNew = score > best;
+    if(isNew){ best = score; localStorage.setItem('mc_best', best); burst(true); }
+    const total = correct + wrong;
+    $('finalScore').textContent = score;
+    $('rCorrect').textContent = correct;
+    $('rAcc').textContent = total ? Math.round(correct/total*100)+'%' : '0%';
+    $('rStreak').textContent = bestStreak;
+    $('rBest').textContent = best;
+    $('bestStart').textContent = best;
+    $('newrec').style.display = isNew && score>0 ? 'block' : 'none';
+    show('result');
+  }
+  function floatText(t, color, dx){
+    const el = document.createElement('div');
+    el.className='bonus'; el.textContent=t; el.style.color=color;
+    el.style.marginLeft = dx+'px';
+    $('card').appendChild(el); setTimeout(()=>el.remove(), 900);
+  }
+
+  /* ---------- Controls ---------- */
+  document.querySelectorAll('[data-lvl]').forEach(b => b.onclick = () => start(b.dataset.lvl));
+  $('again').onclick = () => start(level);
+  $('menu').onclick = () => show('start');
+  $('answer').addEventListener('keydown', e => { if(e.key==='Enter') submit(); });
+
+  const pad = $('pad');
+  ['7','8','9','4','5','6','1','2','3','−','0','OK'].forEach(k => {
+    const b = document.createElement('button'); b.textContent = k;
+    b.onclick = () => {
+      const inp = $('answer');
+      if(k==='OK') submit();
+      else if(k==='−') inp.value = inp.value.startsWith('-') ? inp.value.slice(1) : '-'+inp.value;
+      else inp.value += k;
+    };
+    pad.appendChild(b);
+  });
+
+  /* ---------- Particle effects ---------- */
+  const cv = $('fx'), cx = cv.getContext('2d');
+  let parts = [];
+  const resize = () => { cv.width = innerWidth; cv.height = innerHeight; };
+  addEventListener('resize', resize); resize();
+  function burst(big){
+    const r = $('card').getBoundingClientRect();
+    const ox = r.left + r.width/2, oy = r.top + (big ? r.height/2 : 150);
+    const n = big ? 160 : 28, cols = ['#06b6d4','#7c3aed','#f43f5e','#fde047','#22c55e'];
+    for(let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2, s = (big?9:5)*Math.random()+2;
+      parts.push({x:ox,y:oy,vx:Math.cos(a)*s,vy:Math.sin(a)*s-(big?3:1),life:1,
+        size:Math.random()*4+2,col:cols[rnd(0,cols.length-1)]});
+    }
+  }
+  (function loop(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    parts = parts.filter(p => p.life > 0);
+    for(const p of parts){
+      p.x+=p.vx; p.y+=p.vy; p.vy+=.18; p.life-=.016;
+      cx.globalAlpha = Math.max(p.life,0); cx.fillStyle = p.col;
+      cx.shadowBlur = 12; cx.shadowColor = p.col;
+      cx.beginPath(); cx.arc(p.x,p.y,p.size,0,Math.PI*2); cx.fill();
+    }
+    cx.globalAlpha = 1;
+    requestAnimationFrame(loop);
+  })();
+})();
+</script>
+</body>
+</html>
