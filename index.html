@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Game Arcade – Play All Games in One Place</title>
-<meta name="description" content="Play 18 free games in one page: Pac-Man, Chess, Ludo, Snake, Breakout, Whack-a-Mole, Pong, Flappy Bird, Lights Out, Car Race, Void Striker and more.">
+<meta name="description" content="Play 19 free games in one page: Space Invaders, Pac-Man, Chess, Ludo, Snake, Breakout, Whack-a-Mole, Pong, Flappy Bird, Lights Out, Car Race, Void Striker and more.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
@@ -177,7 +177,7 @@
   <div class="wrap">
     <nav>
       <div class="logo"><i>🎮</i>GAME ARCADE</div>
-      <div class="pill">Pick a game • <b id="countPill">18</b> ready to play</div>
+      <div class="pill">Pick a game • <b id="countPill">19</b> ready to play</div>
     </nav>
 
     <header class="hero">
@@ -185,7 +185,7 @@
       <p>Board classics, 3D battles, space shooters, racing and brain games — all running right here on a single page. No downloads, no sign-ups. Just choose a game and play.</p>
       <button class="cta" id="heroPlay">▶ Start Playing</button>
       <div class="stats">
-        <div class="stat"><strong id="statGames">18</strong><span>Games</span></div>
+        <div class="stat"><strong id="statGames">19</strong><span>Games</span></div>
         <div class="stat"><strong>3D</strong><span>Graphics</span></div>
         <div class="stat"><strong>Free</strong><span>Forever</span></div>
       </div>
@@ -225,17 +225,20 @@
    ===================================================================== */
 const GAMES = [
   /* ---- newest ---- */
-  { id:'pacman', title:'Pac-Man', icon:'👻', path:'pacman/index.html', cat:'Arcade',
-    desc:'Eat every dot, dodge the ghosts and grab power pellets in this maze classic.',
-    tags:['Arcade','Maze','Retro'], badge:'NEW', isNew:true, c1:'#facc15', c2:'#2563eb' },
-  { id:'lightsout', title:'Lights Out', icon:'💡', path:'lightsout/index.html', cat:'Puzzle',
-    desc:'Tap tiles to toggle the lights around them. Can you switch every light off?',
-    tags:['Puzzle','Logic','Brain Game'], badge:'NEW', isNew:true, c1:'#f59e0b', c2:'#7c3aed' },
-  { id:'mathchallenge', title:'Math Challenge', icon:'🔢', path:'mathchalleng/index.html', cat:'Puzzle',
-    desc:'Solve quick maths questions against the clock and sharpen your mental speed.',
-    tags:['Math','Brain Game','Timed'], badge:'NEW', isNew:true, c1:'#0ea5e9', c2:'#10b981' },
+  { id:'spaceinvaders', title:'Space Invaders', icon:'👾', path:'spaceinvaders/index.html', cat:'Arcade',
+    desc:'Defend Earth from waves of descending aliens. Move, shoot and survive the invasion.',
+    tags:['Arcade','Shooter','Retro'], badge:'NEW', isNew:true, c1:'#22c55e', c2:'#6d28d9' },
 
   /* ---- earlier additions ---- */
+  { id:'pacman', title:'Pac-Man', icon:'👻', path:'pacman/index.html', cat:'Arcade',
+    desc:'Eat every dot, dodge the ghosts and grab power pellets in this maze classic.',
+    tags:['Arcade','Maze','Retro'], badge:'MAZE', c1:'#facc15', c2:'#2563eb' },
+  { id:'lightsout', title:'Lights Out', icon:'💡', path:'lightsout/index.html', cat:'Puzzle',
+    desc:'Tap tiles to toggle the lights around them. Can you switch every light off?',
+    tags:['Puzzle','Logic','Brain Game'], badge:'LOGIC', c1:'#f59e0b', c2:'#7c3aed' },
+  { id:'mathchallenge', title:'Math Challenge', icon:'🔢', path:'mathchallenge/index.html', cat:'Puzzle',
+    desc:'Solve quick maths questions against the clock and sharpen your mental speed.',
+    tags:['Math','Brain Game','Timed'], badge:'MATH', c1:'#0ea5e9', c2:'#10b981' },
   { id:'breakout', title:'Breakout', icon:'🧱', path:'breakout/index.html', cat:'Arcade',
     desc:'Bounce the ball off your paddle and smash every brick. Classic arcade fun.',
     tags:['Arcade','Retro','High Score'], badge:'RETRO', c1:'#ec4899', c2:'#8b5cf6' },
